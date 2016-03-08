@@ -13,3 +13,17 @@ var defaults = {
 };
 
 var markdownYt = window.markdownit(defaults);
+markdownYt = markdownYt.use(markdownitAbbr);
+markdownYt = markdownYt.use(markdownitContainer, 'success');
+markdownYt = markdownYt.use(markdownitContainer, 'info');
+markdownYt = markdownYt.use(markdownitContainer, 'warning');
+markdownYt = markdownYt.use(markdownitContainer, 'danger');
+markdownYt = markdownYt.use(markdownitDeflist);
+markdownYt = markdownYt.use(markdownitEmoji);
+markdownYt = markdownYt.use(markdownitFootnote);
+markdownYt = markdownYt.use(markdownitIns);
+markdownYt = markdownYt.use(markdownitMark);
+markdownYt = markdownYt.use(markdownitSub);
+markdownYt = markdownYt.use(markdownitSup);
+
+
