@@ -2,7 +2,6 @@ var defaults = {
     html:         true,        // Enable HTML tags in source
     xhtmlOut:     true,        // Use '/' to close single tags (<br />)
     breaks:       true,        // Convert '\n' in paragraphs into <br>
-    langPrefix:   'language-',  // CSS language prefix for fenced blocks
     linkify:      true,         // autoconvert URL-like texts to links
     typographer:  true,         // Enable smartypants and other sweet transforms
 
@@ -20,6 +19,7 @@ markdownYt = markdownYt.use(markdownitContainer, 'warning');
 markdownYt = markdownYt.use(markdownitContainer, 'danger');
 markdownYt = markdownYt.use(markdownitDeflist);
 markdownYt = markdownYt.use(markdownitEmoji);
+
 markdownYt = markdownYt.use(markdownitFootnote);
 markdownYt = markdownYt.use(markdownitIns);
 markdownYt = markdownYt.use(markdownitMark);
