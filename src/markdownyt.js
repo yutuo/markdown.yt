@@ -25,5 +25,10 @@ markdownYt = markdownYt.use(markdownitIns);
 markdownYt = markdownYt.use(markdownitMark);
 markdownYt = markdownYt.use(markdownitSub);
 markdownYt = markdownYt.use(markdownitSup);
+markdownYt = markdownYt.use(markdownitSimpleMath, {inlineRenderer: function(math) {
+   return katex.renderToString(math);
+}});
+
+
 
 
