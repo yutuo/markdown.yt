@@ -35,10 +35,10 @@ function formatMathContent(mathContent, displayMode, map) {
     return '<span class="math"' + map + '>' + result + '</span>';
 }
 
-module.exports = function(settingOptions) {    
+module.exports = function(settingOptions) {
     var markdownYt = markdownit();
     markdownYt = markdownYt.set(markdownYt.utils.assign({}, settingOptions, defaults));
-    
+
     markdownYt = markdownYt.use(markdownitAbbr);
     markdownYt = markdownYt.use(markdownitContainer, 'success');
     markdownYt = markdownYt.use(markdownitContainer, 'info');
@@ -61,11 +61,11 @@ module.exports = function(settingOptions) {
     var markdownYt = markdownYt.use(markdownitForInline, "url_new_win", "link_open", function (tokens, idx) {
         tokens[idx].attrPush([ "target", "_blank" ]);
     });
-    
+
     //var markdownYt = markdownYt.use(markdownitForInline, "code_new_style", "code_inline", function (tokens, idx) {
     //    tokens[idx].attrPush([ "style", "background-color: red;" ]);
     //});
-    
+
     markdownYt.map = false;
     markdownYt.tags = {};
 
@@ -93,18 +93,18 @@ module.exports = function(settingOptions) {
 
         return markdownYt.renderer.constructor.prototype.renderToken.call(this, tokens, idx, options);
     }
-    
+
     markdownYt.renderer.rules.code_inline = function(tokens, idx) {
-        var content = tokens[idx].content;        
+        var content = tokens[idx].content;
         var matchCode = /^(\w+)#/.exec(content);
         if (matchCode) {
-            return '<code class="' + markdownYt.options.langPrefix + matchCode[1] + '">' 
+            return '<code class="' + markdownYt.options.langPrefix + matchCode[1] + '">'
                    + markdownYt.utils.escapeHtml(content.substring(matchCode[0].length))
                    + '</code>';
-        }        
+        }
         return '<code>' + markdownYt.utils.escapeHtml(content) + '</code>';
     }
-    
+
     markdownYt.renderer.rules.fence = function (tokens, idx, options, env, slf) {
         var token = tokens[idx];
         var code = token.content.trim();
@@ -113,7 +113,7 @@ module.exports = function(settingOptions) {
         if(/math/im.test(token.info)) {
             return formatMathContent(code, true, map);
         }
-        
+
         //if(token.info.length > 0) { // programming language
         //return `<pre${ map }><code class="hljs">${ hljs.highlightAuto(code, [token.info]).value }</code></pre>`;
         //}
@@ -130,16 +130,3 @@ module.exports = function(settingOptions) {
 
 },{}]},{},[1])(1)
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
