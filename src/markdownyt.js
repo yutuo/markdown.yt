@@ -1,0 +1,217 @@
+/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownyt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+
+'use strict';
+
+var defaults = {
+    html:           true,        // Enable HTML tags in source
+    xhtmlOut:       true,        // Use '/' to close single tags (<br />)
+    breaks:         true,        // Convert '\n' in paragraphs into <br>
+    linkify:        true,         // autoconvert URL-like texts to links
+    typographer:    false,         // Enable smartypants and other sweet transforms
+
+
+    useAbbr:        true,
+    useContainer:   true,
+    useDeflist:     true,
+    useEmoji:       true,
+    useFootnote:    true,
+    useIns:         true,
+    useMark:        true,
+    useSub:         true,
+    useSup:         true,
+    useToc:         true,
+    useMath:        false,
+    useLinkNewWin:  false,
+    useSourceLine:  false,
+    useCodeBlockPre:false,
+
+};
+
+
+function makeErrorMark(title, content) {
+    return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
+}
+
+function formatMathContent(mathContent, displayMode, sourceLineString, langPrefix) {
+    var result = '';
+    if (typeof katex === "undefined") {
+        result = makeErrorMark("No Katex", mathContent);
+    }
+    try {
+        result = katex.renderToString(mathContent, {displayMode: displayMode});
+    }
+    catch(err) {
+        result = makeErrorMark("Math Convert Error", mathContent);
+    }
+    return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
+}
+
+function highLightJs(code, langName, isInline, sourceLineString, langPrefix) {
+    var highlighted = code;
+    var langClass = '';
+    if (langName && hljs.getLanguage(langName)) {
+        langClass = ' ' + langPrefix + langName;
+        try {
+            highlighted = hljs.highlight(langName, code, true).value;
+        } catch (__) {}
+    }
+
+
+    if (isInline) {
+        return '<code class="hljs inline' + langClass + '">'
+            + highlighted
+            + '</code>';
+    }
+    else {
+        return  '<pre' + sourceLineString + '><code class="hljs' + langClass + '">'
+            + highlighted + '</code></pre>\n';
+    }
+
+
+}
+
+module.exports = function(settingOptions) {
+    var markdownYt = markdownit();
+    var options = markdownYt.utils.assign({}, defaults, settingOptions);
+    markdownYt = markdownYt.set(options);
+
+    if (options.useAbbr) {
+        markdownYt = markdownYt.use(markdownitAbbr);
+    }
+    if (options.useContainer) {
+        markdownYt = markdownYt.use(markdownitContainer, 'success');
+        markdownYt = markdownYt.use(markdownitContainer, 'info');
+        markdownYt = markdownYt.use(markdownitContainer, 'warning');
+        markdownYt = markdownYt.use(markdownitContainer, 'danger');
+    }
+    if (options.useDeflist) {
+        markdownYt = markdownYt.use(markdownitDeflist);
+    }
+    if (options.useEmoji) {
+        markdownYt = markdownYt.use(markdownitEmoji);
+    }
+    if (options.useFootnote) {
+        markdownYt = markdownYt.use(markdownitFootnote);
+    }
+    if (options.useIns) {
+        markdownYt = markdownYt.use(markdownitIns);
+    }
+    if (options.useMark) {
+        markdownYt = markdownYt.use(markdownitMark);
+    }
+    if (options.useSub) {
+        markdownYt = markdownYt.use(markdownitSub);
+    }
+    if (options.useSup) {
+        markdownYt = markdownYt.use(markdownitSup);
+    }
+    if (options.useToc) {
+        markdownYt = markdownYt.use(markdownitToc);
+    }
+    if (options.useMath) {
+        markdownYt = markdownYt.use(markdownitSimpleMath, {inlineRenderer: function(math, displayMode) {
+            return formatMathContent(math, displayMode, '');
+        }});
+    }
+    if (options.useLinkNewWin) {
+        markdownYt = markdownYt.use(markdownitForInline, "url_new_win", "link_open", function (tokens, idx) {
+            tokens[idx].attrPush([ "target", "_blank" ]);
+        });
+    }
+
+
+    markdownYt.tags = {};
+    markdownYt.renderer.renderToken = function(tokens, idx, options) {
+        var token = tokens[idx];
+        var tag = token.type;
+        var mainTag = '';
+        if(tag.endsWith('_open')) {
+            mainTag = tag.substr(0, tag.length - 5);
+            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) + 1;
+
+            // source map
+            if(options.useSourceLine && token.level == 0 && token.map != null) {
+                token.attrPush(['data-source-line', token.map[0] + 1]);
+            }
+        } else if (tag.endsWith('_close')) {
+            mainTag = tag.substr(0, tag.length - 6);
+            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) - 1;
+        }
+
+        return markdownYt.renderer.constructor.prototype.renderToken.call(this, tokens, idx, options);
+    };
+
+    markdownYt.renderer.rules.code_inline = function(tokens, idx) {
+        var content = tokens[idx].content;
+        var langName = '';
+
+        var matchCode = /^(\w+)#/.exec(content);
+        if (matchCode) {
+            langName = matchCode[1];
+            content = content.substring(matchCode[0].length);
+        }
+
+        if (options.highlight !== true && options.highlight) {
+            return options.highlight(content, langName, true, '', markdownYt.options.langPrefix);
+        }
+        if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(content, langName, true, '', markdownYt.options.langPrefix);
+        }
+        else if (langName.length > 0) {
+            return '<code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(content)
+                + '</code>';
+        }
+        else {
+            return '<code>' + markdownYt.utils.escapeHtml(content) + '</code>';
+        }
+    };
+
+    markdownYt.renderer.rules.fence = function (tokens, idx, options) {
+        var token = tokens[idx];
+        var code = token.content.trim();
+        var langName = token.info.trim();
+        var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
+
+        if(options.useMath && /math/im.test(langName)) {
+            return formatMathContent(code, true, sourceLineString);
+        }
+
+        if (options.highlight !== true && options.highlight) {
+            return options.highlight(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+        }
+        if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+        }
+        else if (langName) {
+            return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+        else {
+            return  '<pre' + sourceLineString + '><code>'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+    };
+
+    markdownYt.renderer.rules.code_block = function (tokens, idx, options) {
+        var token = tokens[idx];
+        var code = token.content.trim();
+        var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
+
+        if (options.useCodeBlockPre) {
+            return  '<pre' + sourceLineString + '>' + markdownYt.utils.escapeHtml(code) + '</pre>\n';
+        }
+        else {
+            return  '<pre' + sourceLineString + '><code>'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+    };
+
+    return markdownYt;
+};
+
+},{}]},{},[1])(1)
+});
