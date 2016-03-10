@@ -5,11 +5,15 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="../lib/katex/katex.min.css">
+
     <script src="../lib/jquery/jquery.min.js"></script>
     <script src="../lib/lodash/lodash.min.js"></script>
-    
+
+    <link rel="stylesheet" href="../lib/katex/katex.min.css">
     <script src="../lib/katex/katex.min.js"></script>
+
+    <link rel="stylesheet" href="../lib/highlightjs/styles/androidstudio.css">
+    <script src="../lib/highlightjs/highlight.min.js"></script>
 
     <script src="../lib/markdown-it/markdown-it.js"></script>
     <script src="../lib/markdown-it/markdown-it-abbr.js"></script>
@@ -25,12 +29,14 @@
     <script src="../lib/markdown-it/markdown-it-toc.js"></script>
     <script src="../lib/markdown-it/markdown-it-simplemath.js"></script>
 
+    <link rel="stylesheet" href="../css/markdownyt.css">
     <script src="../src/markdownyt.js"></script>
 
     <script>
         $(function(){
             var markdownYt = markdownyt({
-                useMath:        true,
+                useMath: true,
+                highlight: true,
             });
             function updateResult() {
                 var source = $('.source').val();
@@ -188,6 +194,8 @@ Start numbering with offset:
 ## Code
 
 Inline `code`
+
+Inline code with language name `js#console.log("test");`
 
 Indented code
 
@@ -357,8 +365,6 @@ It converts &quot;HTML&quot;, but keep intact partial entries like &quot;xxxHTML
         <section class="col-xs-6 full-height">
             <div class="demo-control"><a href="#" data-result-as="html">html</a><a href="#" data-result-as="src">source</a><a href="#" data-result-as="debug">debug</a></div>
             <div class="result-html full-height"></div>
-            <pre class="hljs result-src full-height"><code class="result-src-content full-height"></code></pre>
-            <pre class="hljs result-debug full-height"><code class="result-debug-content full-height"></code></pre>
         </section>
     </div>
 </div>

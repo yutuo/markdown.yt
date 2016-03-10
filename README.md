@@ -26,8 +26,7 @@ markdown.yt是一个基于[markdown-it](https://github.com/markdown-it/markdown-
 * [markdown-it-simplemath](https://github.com/adam-p/markdown-it-simplemath) 1.0.0
 * [markdown-it-toc](https://github.com/tylerlong/markdown-it-toc) 0.0.8
 * [KaTeX](https://github.com/Khan/KaTeX) 0.5.1
-    
-
+* [highlight.js](https://github.com/isagalaev/highlight.js) 9.2.0
 
 ### License
 

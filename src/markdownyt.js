@@ -1,5 +1,4 @@
-/*! markdown-it-toc 1.0.0 https://github.com/samchrisinger/markdown-it-toc @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownyt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-// Process @[toc](|Title)
+/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownyt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 
 'use strict';
 
@@ -8,7 +7,7 @@ var defaults = {
     xhtmlOut:       true,        // Use '/' to close single tags (<br />)
     breaks:         true,        // Convert '\n' in paragraphs into <br>
     linkify:        true,         // autoconvert URL-like texts to links
-    typographer:    true,         // Enable smartypants and other sweet transforms
+    typographer:    false,         // Enable smartypants and other sweet transforms
 
 
     useAbbr:        true,
@@ -33,7 +32,7 @@ function makeErrorMark(title, content) {
     return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
 }
 
-function formatMathContent(mathContent, displayMode, sourceLineString) {
+function formatMathContent(mathContent, displayMode, sourceLineString, langPrefix) {
     var result = '';
     if (typeof katex === "undefined") {
         result = makeErrorMark("No Katex", mathContent);
@@ -45,6 +44,30 @@ function formatMathContent(mathContent, displayMode, sourceLineString) {
         result = makeErrorMark("Math Convert Error", mathContent);
     }
     return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
+}
+
+function highLightJs(code, langName, isInline, sourceLineString, langPrefix) {
+    var highlighted = code;
+    var langClass = '';
+    if (langName && hljs.getLanguage(langName)) {
+        langClass = ' ' + langPrefix + langName;
+        try {
+            highlighted = hljs.highlight(langName, code, true).value;
+        } catch (__) {}
+    }
+
+
+    if (isInline) {
+        return '<code class="hljs inline' + langClass + '">'
+            + highlighted
+            + '</code>';
+    }
+    else {
+        return  '<pre' + sourceLineString + '><code class="hljs' + langClass + '">'
+            + highlighted + '</code></pre>\n';
+    }
+
+
 }
 
 module.exports = function(settingOptions) {
@@ -128,8 +151,11 @@ module.exports = function(settingOptions) {
             content = content.substring(matchCode[0].length);
         }
 
-        if (options.highlight) {
-            return options.highlight(content, langName, true, '');
+        if (options.highlight !== true && options.highlight) {
+            return options.highlight(content, langName, true, '', markdownYt.options.langPrefix);
+        }
+        if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(content, langName, true, '', markdownYt.options.langPrefix);
         }
         else if (langName.length > 0) {
             return '<code class="' + markdownYt.options.langPrefix + langName + '">'
@@ -151,11 +177,19 @@ module.exports = function(settingOptions) {
             return formatMathContent(code, true, sourceLineString);
         }
 
-        if (options.highlight) {
-            return options.highlight(code, langName, false, sourceLineString);
+        if (options.highlight !== true && options.highlight) {
+            return options.highlight(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+        }
+        if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+        }
+        else if (langName) {
+            return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
         }
         else {
-            return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
+            return  '<pre' + sourceLineString + '><code>'
                 + markdownYt.utils.escapeHtml(code)
                 + '</code></pre>\n';
         }
