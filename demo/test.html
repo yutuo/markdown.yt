@@ -29,7 +29,9 @@
 
     <script>
         $(function(){
-            var markdownYt = markdownyt();
+            var markdownYt = markdownyt({
+                useMath:        true,
+            });
             function updateResult() {
                 var source = $('.source').val();
                 if (source) {
@@ -322,6 +324,19 @@ Term 1
 Term 2
   ~ Definition 2a
   ~ Definition 2b
+
+### Math
+
+$$x = y ^ 2$$
+
+Math in line $$x = y ^ 2$$.
+
+**Math Block**
+
+```math
+x = y ^ 2
+    + z
+```
 
 
 ### [Abbreviations](https://github.com/markdown-it/markdown-it-abbr)

@@ -4,16 +4,28 @@
 'use strict';
 
 var defaults = {
-    html:         true,        // Enable HTML tags in source
-    xhtmlOut:     true,        // Use '/' to close single tags (<br />)
-    breaks:       true,        // Convert '\n' in paragraphs into <br>
-    linkify:      true,         // autoconvert URL-like texts to links
-    typographer:  true,         // Enable smartypants and other sweet transforms
+    html:           true,        // Enable HTML tags in source
+    xhtmlOut:       true,        // Use '/' to close single tags (<br />)
+    breaks:         true,        // Convert '\n' in paragraphs into <br>
+    linkify:        true,         // autoconvert URL-like texts to links
+    typographer:    true,         // Enable smartypants and other sweet transforms
 
-    // options below are for demo only
-    //_highlight: true,
-    //_strict: false,
-    //_view: 'html'               // html / src / debug
+
+    useAbbr:        true,
+    useContainer:   true,
+    useDeflist:     true,
+    useEmoji:       true,
+    useFootnote:    true,
+    useIns:         true,
+    useMark:        true,
+    useSub:         true,
+    useSup:         true,
+    useToc:         true,
+    useMath:        false,
+    useLinkNewWin:  false,
+    useSourceLine:  false,
+    useCodeBlockPre:false,
+
 };
 
 
@@ -21,7 +33,7 @@ function makeErrorMark(title, content) {
     return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
 }
 
-function formatMathContent(mathContent, displayMode, map) {
+function formatMathContent(mathContent, displayMode, sourceLineString) {
     var result = '';
     if (typeof katex === "undefined") {
         result = makeErrorMark("No Katex", mathContent);
@@ -32,98 +44,137 @@ function formatMathContent(mathContent, displayMode, map) {
     catch(err) {
         result = makeErrorMark("Math Convert Error", mathContent);
     }
-    return '<span class="math"' + map + '>' + result + '</span>';
+    return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
 }
 
 module.exports = function(settingOptions) {
     var markdownYt = markdownit();
-    markdownYt = markdownYt.set(markdownYt.utils.assign({}, settingOptions, defaults));
+    var options = markdownYt.utils.assign({}, defaults, settingOptions);
+    markdownYt = markdownYt.set(options);
 
-    markdownYt = markdownYt.use(markdownitAbbr);
-    markdownYt = markdownYt.use(markdownitContainer, 'success');
-    markdownYt = markdownYt.use(markdownitContainer, 'info');
-    markdownYt = markdownYt.use(markdownitContainer, 'warning');
-    markdownYt = markdownYt.use(markdownitContainer, 'danger');
-    markdownYt = markdownYt.use(markdownitDeflist);
-    markdownYt = markdownYt.use(markdownitEmoji);
+    if (options.useAbbr) {
+        markdownYt = markdownYt.use(markdownitAbbr);
+    }
+    if (options.useContainer) {
+        markdownYt = markdownYt.use(markdownitContainer, 'success');
+        markdownYt = markdownYt.use(markdownitContainer, 'info');
+        markdownYt = markdownYt.use(markdownitContainer, 'warning');
+        markdownYt = markdownYt.use(markdownitContainer, 'danger');
+    }
+    if (options.useDeflist) {
+        markdownYt = markdownYt.use(markdownitDeflist);
+    }
+    if (options.useEmoji) {
+        markdownYt = markdownYt.use(markdownitEmoji);
+    }
+    if (options.useFootnote) {
+        markdownYt = markdownYt.use(markdownitFootnote);
+    }
+    if (options.useIns) {
+        markdownYt = markdownYt.use(markdownitIns);
+    }
+    if (options.useMark) {
+        markdownYt = markdownYt.use(markdownitMark);
+    }
+    if (options.useSub) {
+        markdownYt = markdownYt.use(markdownitSub);
+    }
+    if (options.useSup) {
+        markdownYt = markdownYt.use(markdownitSup);
+    }
+    if (options.useToc) {
+        markdownYt = markdownYt.use(markdownitToc);
+    }
+    if (options.useMath) {
+        markdownYt = markdownYt.use(markdownitSimpleMath, {inlineRenderer: function(math, displayMode) {
+            return formatMathContent(math, displayMode, '');
+        }});
+    }
+    if (options.useLinkNewWin) {
+        markdownYt = markdownYt.use(markdownitForInline, "url_new_win", "link_open", function (tokens, idx) {
+            tokens[idx].attrPush([ "target", "_blank" ]);
+        });
+    }
 
-    markdownYt = markdownYt.use(markdownitFootnote);
-    markdownYt = markdownYt.use(markdownitIns);
-    markdownYt = markdownYt.use(markdownitMark);
-    markdownYt = markdownYt.use(markdownitSub);
-    markdownYt = markdownYt.use(markdownitSup);
-    markdownYt = markdownYt.use(markdownitToc);
 
-    markdownYt = markdownYt.use(markdownitSimpleMath, {inlineRenderer: function(math, displayMode) {
-       return formatMathContent(math, displayMode, '');
-    }});
-
-    var markdownYt = markdownYt.use(markdownitForInline, "url_new_win", "link_open", function (tokens, idx) {
-        tokens[idx].attrPush([ "target", "_blank" ]);
-    });
-
-    //var markdownYt = markdownYt.use(markdownitForInline, "code_new_style", "code_inline", function (tokens, idx) {
-    //    tokens[idx].attrPush([ "style", "background-color: red;" ]);
-    //});
-
-    markdownYt.map = false;
     markdownYt.tags = {};
-
     markdownYt.renderer.renderToken = function(tokens, idx, options) {
         var token = tokens[idx];
         var tag = token.type;
+        var mainTag = '';
         if(tag.endsWith('_open')) {
-            var _tag = tag.substr(0, tag.length - 5);
-            markdownYt.tags[_tag] = (markdownYt.tags[_tag] || 0) + 1;
+            mainTag = tag.substr(0, tag.length - 5);
+            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) + 1;
 
             // source map
-            if(markdownYt.map && token.level == 0 && token.map != null) {
+            if(options.useSourceLine && token.level == 0 && token.map != null) {
                 token.attrPush(['data-source-line', token.map[0] + 1]);
             }
         } else if (tag.endsWith('_close')) {
-            var _tag = tag.substr(0, tag.length - 6);
-            markdownYt.tags[_tag] = (markdownYt.tags[_tag] || 0) - 1;
+            mainTag = tag.substr(0, tag.length - 6);
+            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) - 1;
         }
 
-        // task list
-        //if((markdownYt.tags['bullet_list'] || 0) > 0 && tag == 'list_item_open'
-        // && (tokens[idx+2].content.startsWith('[ ] ') || tokens[idx+2].content.startsWith('[x] '))) {
-        //    token.attrPush(['class', 'task-list-item']);
-        //}
-
         return markdownYt.renderer.constructor.prototype.renderToken.call(this, tokens, idx, options);
-    }
+    };
 
     markdownYt.renderer.rules.code_inline = function(tokens, idx) {
         var content = tokens[idx].content;
+        var langName = '';
+
         var matchCode = /^(\w+)#/.exec(content);
         if (matchCode) {
-            return '<code class="' + markdownYt.options.langPrefix + matchCode[1] + '">'
-                   + markdownYt.utils.escapeHtml(content.substring(matchCode[0].length))
-                   + '</code>';
+            langName = matchCode[1];
+            content = content.substring(matchCode[0].length);
         }
-        return '<code>' + markdownYt.utils.escapeHtml(content) + '</code>';
-    }
 
-    markdownYt.renderer.rules.fence = function (tokens, idx, options, env, slf) {
+        if (options.highlight) {
+            return options.highlight(content, langName, true, '');
+        }
+        else if (langName.length > 0) {
+            return '<code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(content)
+                + '</code>';
+        }
+        else {
+            return '<code>' + markdownYt.utils.escapeHtml(content) + '</code>';
+        }
+    };
+
+    markdownYt.renderer.rules.fence = function (tokens, idx, options) {
         var token = tokens[idx];
         var code = token.content.trim();
-        var map = markdownYt.map ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
+        var langName = token.info.trim();
+        var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
 
-        if(/math/im.test(token.info)) {
-            return formatMathContent(code, true, map);
+        if(options.useMath && /math/im.test(langName)) {
+            return formatMathContent(code, true, sourceLineString);
         }
 
-        //if(token.info.length > 0) { // programming language
-        //return `<pre${ map }><code class="hljs">${ hljs.highlightAuto(code, [token.info]).value }</code></pre>`;
-        //}
-        //var firstLine = code.split(/\n/)[0].trim();
-        //if(firstLine === 'gantt' || firstLine === 'sequenceDiagram' || firstLine.match(/^graph (?:TB|BT|RL|LR|TD);?$/)) {
-        //return markdownYt.mermaid_charts(code, map); // mermaid
-        //}
-        // unknown programming language
-        //return `<pre${ map }><code class="hljs">${ hljs.highlightAuto(code).value }</code></pre>`;
-    }
+        if (options.highlight) {
+            return options.highlight(code, langName, false, sourceLineString);
+        }
+        else {
+            return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+    };
+
+    markdownYt.renderer.rules.code_block = function (tokens, idx, options) {
+        var token = tokens[idx];
+        var code = token.content.trim();
+        var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
+
+        if (options.useCodeBlockPre) {
+            return  '<pre' + sourceLineString + '>' + markdownYt.utils.escapeHtml(code) + '</pre>\n';
+        }
+        else {
+            return  '<pre' + sourceLineString + '><code>'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+    };
 
     return markdownYt;
 };

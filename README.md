@@ -25,11 +25,9 @@ markdown.yt是一个基于[markdown-it](https://github.com/markdown-it/markdown-
 * [markdown-it-sup](https://github.com/markdown-it/markdown-it-sup) 1.0.0
 * [markdown-it-simplemath](https://github.com/adam-p/markdown-it-simplemath) 1.0.0
 * [markdown-it-toc](https://github.com/tylerlong/markdown-it-toc) 0.0.8
+* [KaTeX](https://github.com/Khan/KaTeX) 0.5.1
     
-==Marked text==
 
-
-### [Footnotes](https://github.com/markdown-it/markdown-it-footnote)
 
 ### License
 
