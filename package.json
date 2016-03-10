@@ -15,14 +15,12 @@
     "url": "https://github.com/yutuo/markdown.yt.git"
   },
   "keywords": [
-    "editor.md",
-    "markdown",
-    "editor"
+    "markdown"
   ],
   "author": "Yutuo",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/pandao/editor.md/issues"
+    "url": "https://github.com/yutuo/markdown.yt/issues"
   },
   "homepage": "https://github.com/yutuo/markdown.yt",
   "devDependencies": {
