@@ -34,186 +34,42 @@ var headerComment = ["/*",
 
 var headerMiniComment = "/*! <%= pkg.name %> v<%= pkg.version %> | <%= fileName(file) %> | <%= pkg.description %> | MIT License | By: <%= pkg.author %> | <%= pkg.homepage %> | <%=pkg.today('Y-m-d') %> */\r\n";
 
-var codeMirror = {
-    path: {
-        src: {
-            base: "lib/codemirror",
-            mode: "lib/codemirror/mode",
-            addon: "lib/codemirror/addon"
-        },
-        dist: "lib/codemirror"
-    },
-    base: [
-        "lib/codemirror",
-        "addon/mode/simple",
-        "addon/mode/overlay",
-        "addon/mode/loadmode",
-        "addon/mode/multiplex",
-        "addon/runmode/runmode",
-        "mode/meta",
-    ],
+var jsSrcs = [
+    "lib/markdown-it/markdown-it.js",
+    "lib/markdown-it/markdown-it-abbr.js",
+    "lib/markdown-it/markdown-it-container.js",
+    "lib/markdown-it/markdown-it-deflist.js",
+    "lib/markdown-it/markdown-it-emoji.js",
+    "lib/markdown-it/markdown-it-footnote.js",
+    "lib/markdown-it/markdown-it-for-inline.js",
+    "lib/markdown-it/markdown-it-ins.js",
+    "lib/markdown-it/markdown-it-mark.js",
+    "lib/markdown-it/markdown-it-sub.js",
+    "lib/markdown-it/markdown-it-sup.js",
+    "lib/markdown-it/markdown-it-toc.js",
+    "lib/markdown-it/markdown-it-simplemath.js",
+    
+    
+    "src/markdownyt.js",
+];
 
-    modes: [
-        "apl",
-        "asciiarmor",
-        "asn.1",
-        "asterisk",
-        "brainfuck",
-        "clike",
-        "clojure",
-        "cmake",
-        "cobol",
-        "coffeescript",
-        "commonlisp",
-        "crystal",
-        "css",
-        "cypher",
-        "d",
-        "dart",
-        "diff",
-        "django",
-        "dockerfile",
-        "dtd",
-        "dylan",
-        "ebnf",
-        "ecl",
-        "eiffel",
-        "elm",
-        "erlang",
-        "factor",
-        "fcl",
-        "forth",
-        "fortran",
-        "gas",
-        "gfm",
-        "gherkin",
-        "go",
-        "groovy",
-        "haml",
-        "handlebars",
-        "haskell",
-        "haskell-literate",
-        "haxe",
-        "htmlembedded",
-        "htmlmixed",
-        "http",
-        "idl",
-        "jade",
-        "javascript",
-        "jinja2",
-        "jsx",
-        "julia",
-        "livescript",
-        "lua",
-        "markdown",
-        "mathematica",
-        "mirc",
-        "mllike",
-        "modelica",
-        "mscgen",
-        "mumps",
-        "nginx",
-        "nsis",
-        "ntriples",
-        "octave",
-        "oz",
-        "pascal",
-        "pegjs",
-        "perl",
-        "php",
-        "pig",
-        "properties",
-        "puppet",
-        "python",
-        "q",
-        "r",
-        "rpm",
-        "rst",
-        "ruby",
-        "rust",
-        "sass",
-        "scheme",
-        "shell",
-        "sieve",
-        "slim",
-        "smalltalk",
-        "smarty",
-        "solr",
-        "soy",
-        "sparql",
-        "spreadsheet",
-        "sql",
-        "stex",
-        "stylus",
-        "swift",
-        "tcl",
-        "textile",
-        "tiddlywiki",
-        "tiki",
-        "toml",
-        "tornado",
-        "troff",
-        "ttcn",
-        "ttcn-cfg",
-        "turtle",
-        "twig",
-        "vb",
-        "vbscript",
-        "velocity",
-        "verilog",
-        "vhdl",
-        "vue",
-        "xml",
-        "xquery",
-        "yaml",
-        "yaml-frontmatter",
-        "z80",
-    ],
-
-    addons: [
-        "edit/trailingspace",
-        "dialog/dialog",
-        "search/searchcursor",
-        "search/search",
-        "scroll/annotatescrollbar",
-        "search/matchesonscrollbar",
-        "display/placeholder",
-        "edit/closetag",
-        "fold/foldcode",
-        "fold/foldgutter",
-        "fold/indent-fold",
-        "fold/brace-fold",
-        "fold/xml-fold",
-        "fold/markdown-fold",
-        "fold/comment-fold",
-        "selection/active-line",
-        "edit/closebrackets",
-        "display/fullscreen",
-        "search/match-highlighter"
-    ]
-};
+var dist = "dist";
 
 gulp.task("js", function () {
-
-    var bases = [];
-    for (var i in codeMirror.base) {
-        var base = codeMirror.base[i];
-        bases.push(codeMirror.path.src.base + "/" + base + ".js");
-    }
-
-    return gulp.src(bases)
-        .pipe(concat("codemirror.min.js"))
-        .pipe(gulp.dest(codeMirror.path.dist))
-        .pipe(uglify()) // {outSourceMap: true, sourceRoot: codeMirror.path.dist}
-        .pipe(gulp.dest(codeMirror.path.dist))
+    
+    return gulp.src(jsSrcs)
+        .pipe(concat("markdownyt.min.js"))
+        .pipe(gulp.dest(dist))
+        .pipe(uglify())
+        .pipe(gulp.dest(dist))
         .pipe(header(headerMiniComment, {
             pkg: pkg, fileName: function (file) {
                 var name = file.path.split(file.base + "\\");
                 return (name[1] ? name[1] : name[0]).replace(/\\/g, "");
             }
         }))
-        .pipe(gulp.dest(codeMirror.path.dist))
-        .pipe(notify({message: "codemirror task complete!"}));
+        .pipe(gulp.dest(dist))
+        .pipe(notify({message: "markdownyt js task complete!"}));
 });
 
 

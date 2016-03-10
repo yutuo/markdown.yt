@@ -11,23 +11,25 @@
     
     <script src="../lib/katex/katex.min.js"></script>
 
-    <script src="../lib/markdown-it/markdown-it.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-abbr.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-container.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-deflist.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-emoji.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-footnote.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-for-inline.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-ins.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-mark.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-sub.min.js"></script>
-    <script src="../lib/markdown-it/markdown-it-sup.min.js"></script>    
+    <script src="../lib/markdown-it/markdown-it.js"></script>
+    <script src="../lib/markdown-it/markdown-it-abbr.js"></script>
+    <script src="../lib/markdown-it/markdown-it-container.js"></script>
+    <script src="../lib/markdown-it/markdown-it-deflist.js"></script>
+    <script src="../lib/markdown-it/markdown-it-emoji.js"></script>
+    <script src="../lib/markdown-it/markdown-it-footnote.js"></script>
+    <script src="../lib/markdown-it/markdown-it-for-inline.js"></script>
+    <script src="../lib/markdown-it/markdown-it-ins.js"></script>
+    <script src="../lib/markdown-it/markdown-it-mark.js"></script>
+    <script src="../lib/markdown-it/markdown-it-sub.js"></script>
+    <script src="../lib/markdown-it/markdown-it-sup.js"></script>
+    <script src="../lib/markdown-it/markdown-it-toc.js"></script>
     <script src="../lib/markdown-it/markdown-it-simplemath.js"></script>
 
     <script src="../src/markdownyt.js"></script>
 
     <script>
         $(function(){
+            var markdownYt = markdownyt();
             function updateResult() {
                 var source = $('.source').val();
                 if (source) {
