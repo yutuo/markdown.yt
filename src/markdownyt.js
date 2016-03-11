@@ -1,4 +1,5 @@
-/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownyt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownyt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}
+)({1:[function(require,module,exports){
 
 'use strict';
 
@@ -56,18 +57,22 @@ function highLightJs(code, langName, isInline, sourceLineString, langPrefix) {
         } catch (__) {}
     }
 
-
     if (isInline) {
         return '<code class="hljs inline' + langClass + '">'
             + highlighted
             + '</code>';
     }
     else {
-        return  '<pre' + sourceLineString + '><code class="hljs' + langClass + '">'
-            + highlighted + '</code></pre>\n';
+        //var langNameDisplay = '<div class="show-language"><div class="show-language-label">CSS</div></div>';
+        var langNameDisplay = '';
+        var match = code.match(/\n(?!$)/g);
+        var linesNum = match ? match.length + 1 : 1;
+        var lines = new Array(linesNum + 1);
+        var lineNumbersWrapper = '<span class="line-numbers-rows">' + lines.join('<span></span>') + '</span>';
+
+        return '<pre' + sourceLineString + ' class="hljs line-numbers"><code class="' + langClass + '">'
+            + highlighted + lineNumbersWrapper + '</code>' + langNameDisplay + '</pre>\n';
     }
-
-
 }
 
 module.exports = function(settingOptions) {
@@ -125,7 +130,7 @@ module.exports = function(settingOptions) {
         var token = tokens[idx];
         var tag = token.type;
         var mainTag = '';
-        if(tag.endsWith('_open')) {
+        if(tag.match(/_open/im)) {
             mainTag = tag.substr(0, tag.length - 5);
             markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) + 1;
 
@@ -133,7 +138,7 @@ module.exports = function(settingOptions) {
             if(options.useSourceLine && token.level == 0 && token.map != null) {
                 token.attrPush(['data-source-line', token.map[0] + 1]);
             }
-        } else if (tag.endsWith('_close')) {
+        } else if (tag.match(/_close/im)) {
             mainTag = tag.substr(0, tag.length - 6);
             markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) - 1;
         }
@@ -204,9 +209,10 @@ module.exports = function(settingOptions) {
             return  '<pre' + sourceLineString + '>' + markdownYt.utils.escapeHtml(code) + '</pre>\n';
         }
         else {
-            return  '<pre' + sourceLineString + '><code>'
-                + markdownYt.utils.escapeHtml(code)
-                + '</code></pre>\n';
+            return highLightJs(code, '', false, sourceLineString, markdownYt.options.langPrefix);
+            //return  '<pre' + sourceLineString + '><code>'
+            //    + markdownYt.utils.escapeHtml(code)
+            //    + '</code></pre>\n';
         }
     };
 

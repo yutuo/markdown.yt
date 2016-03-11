@@ -1,5 +1,84 @@
+pre.hljs, pre.hljs code {
+    font-family: Consolas,Monaco,"Andale Mono","Ubuntu Mono",monospace;
+    line-height: 1.2;
+    font-size: 13px;
+    
+    -webkit-hyphens: none;
+	-moz-hyphens: none;
+	-ms-hyphens: none;
+}
+
 .hljs.inline {
     display: inline-block;
     padding: 0 4px;
     vertical-align: middle;
+}
+
+pre.line-numbers {
+	position: relative;
+	padding-left: 60px;
+	counter-reset: linenumber;
+}
+
+pre.line-numbers > code {
+	position: relative;
+}
+
+.line-numbers .line-numbers-rows {
+	position: absolute;
+	pointer-events: none;
+	top: 0px;
+    font-size: 100%;
+	left: -60px;
+	width: 48px;
+	letter-spacing: -1px;
+	border-right: 1px solid #999;
+
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+.line-numbers-rows > span {
+    pointer-events: none;
+    display: block;
+    counter-increment: linenumber;
+}
+
+.line-numbers-rows > span:before {
+    content: counter(linenumber);
+    color: #999;
+    display: block;
+    padding-right: 0.8em;
+    text-align: right;
+}
+
+div.show-language {
+	position: relative;
+}
+
+div.show-language > div.show-language-label {
+	color: black;
+	background-color: #CFCFCF;
+	display: inline-block;
+	position: absolute;
+	bottom: auto;
+	left: auto;
+	top: -5px;
+    right: -5px;
+	width: auto;
+	height: auto;
+	border-radius: 0 0 0 5px;
+	padding: 0 8px;
+	text-shadow: none;
+	z-index: 1;
+	-webkit-box-shadow: none;
+	-moz-box-shadow: none;
+	box-shadow: none;
+	-webkit-transform: none;
+	-moz-transform: none;
+	-ms-transform: none;
+	-o-transform: none;
+	transform: none;
 }
