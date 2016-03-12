@@ -57,31 +57,23 @@ pre.line-numbers > code {
     text-align: right;
 }
 
-div.show-language {
-	position: relative;
-}
-
-div.show-language > div.show-language-label {
-	color: black;
-	background-color: #CFCFCF;
-	display: inline-block;
+.show-language {
 	position: absolute;
-	bottom: auto;
-	left: auto;
-	top: -5px;
-    right: -5px;
-	width: auto;
-	height: auto;
+    color: black;
+	background-color: #CFCFCF;
+	top: 1px;
+    right: 1px;
 	border-radius: 0 0 0 5px;
-	padding: 0 8px;
-	text-shadow: none;
+	padding: 0 8px 2px 8px;
 	z-index: 1;
-	-webkit-box-shadow: none;
-	-moz-box-shadow: none;
-	box-shadow: none;
 	-webkit-transform: none;
 	-moz-transform: none;
 	-ms-transform: none;
 	-o-transform: none;
 	transform: none;
+    
+    -webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
 }
