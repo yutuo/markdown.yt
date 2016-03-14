@@ -17,8 +17,11 @@ pre.hljs, pre.hljs code {
     vertical-align: middle;
 }
 
+pre.hljs {
+    position: relative;
+}
+
 pre.line-numbers {
-	position: relative;
 	padding-left: 60px;
 	counter-reset: linenumber;
 }

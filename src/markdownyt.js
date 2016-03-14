@@ -22,9 +22,14 @@ var defaults = {
     useSup:         true,
     useToc:         true,
     useMath:        false,
+
     useLinkNewWin:  false,
     useSourceLine:  false,
     useCodeBlockPre:false,
+    
+    highlight:      false,
+    useLineNumber:  true,
+    useShowLangName:true,
 
 };
 
@@ -284,7 +289,7 @@ function makeErrorMark(title, content) {
     return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
 }
 
-function formatMathContent(mathContent, displayMode, sourceLineString, langPrefix) {
+function formatMathContent(mathContent, displayMode, sourceLineString, options) {
     var result = '';
     if (typeof katex === "undefined") {
         result = makeErrorMark("No Katex", mathContent);
@@ -298,22 +303,21 @@ function formatMathContent(mathContent, displayMode, sourceLineString, langPrefi
     return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
 }
 
-function highLightJs(code, langName, isInline, sourceLineString, langPrefix) {
+function highLightJs(code, langInfo, isInline, sourceLineString, options) {
     var highlighted = code;
     var langClass = '';
-    var langDisplay = langNamesForDisplay[langName];
+    var langDisplay = langNamesForDisplay[langInfo.toLowerCase()];
     var langNameDisplay = '';
-    
         
-    if (langName && hljs.getLanguage(langName)) {
-        langClass = ' ' + langPrefix + langName;
+    if (langInfo && hljs.getLanguage(langInfo)) {
+        langClass = ' ' + options.langPrefix + langInfo;
         try {
-            highlighted = hljs.highlight(langName, code, true).value;
+            highlighted = hljs.highlight(langInfo, code, true).value;
         } catch (__) {}
     }
 
     if (isInline) {
-        if (langDisplay) {
+        if (langDisplay && options.useShowLangName) {
             langNameDisplay = ' title="' + langDisplay + '"';
         }
         return '<code class="hljs inline' + langClass + '"' + langNameDisplay + '>'
@@ -321,15 +325,20 @@ function highLightJs(code, langName, isInline, sourceLineString, langPrefix) {
             + '</code>';
     }
     else {
-        if (langDisplay) {
+        if (langDisplay && options.useShowLangName) {
             langNameDisplay = '<span class="show-language">' + langDisplay + '</span>';
         }
-        var match = code.match(/\n(?!$)/g);
-        var linesNum = match ? match.length + 1 : 1;
-        var lines = new Array(linesNum + 1);
-        var lineNumbersWrapper = '<span class="line-numbers-rows">' + lines.join('<span></span>') + '</span>';
+        var lineNumbersWrapper = '';
+        var lineNumbersClass = ''; 
+        if (options.useLineNumber) {
+            var match = code.match(/\n(?!$)/g);
+            var linesNum = match ? match.length + 1 : 1;
+            var lines = new Array(linesNum + 1);
+            lineNumbersWrapper = '<span class="line-numbers-rows">' + lines.join('<span></span>') + '</span>';
+            lineNumbersClass = ' line-numbers';
+        }
 
-        return '<pre' + sourceLineString + ' class="hljs line-numbers"><code class="' + langClass + '">'
+        return '<pre' + sourceLineString + ' class="hljs' + lineNumbersClass + '"><code class="' + langClass + '">'
             + highlighted + lineNumbersWrapper + '</code>' + langNameDisplay + '</pre>\n';
     }
 }
@@ -404,7 +413,7 @@ module.exports = function(settingOptions) {
         return markdownYt.renderer.constructor.prototype.renderToken.call(this, tokens, idx, options);
     };
 
-    markdownYt.renderer.rules.code_inline = function(tokens, idx) {
+    markdownYt.renderer.rules.code_inline = function(tokens, idx, options) {
         var content = tokens[idx].content;
         var langName = '';
 
@@ -415,10 +424,10 @@ module.exports = function(settingOptions) {
         }
 
         if (options.highlight !== true && options.highlight) {
-            return options.highlight(content, langName, true, '', markdownYt.options.langPrefix);
+            return options.highlight(content, langName, true, '', markdownYt.options);
         }
-        if (options.highlight === true && typeof hljs !== "undefined") {
-            return highLightJs(content, langName, true, '', markdownYt.options.langPrefix);
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(content, langName, true, '', markdownYt.options);
         }
         else if (langName.length > 0) {
             return '<code class="' + markdownYt.options.langPrefix + langName + '">'
@@ -441,10 +450,10 @@ module.exports = function(settingOptions) {
         }
 
         if (options.highlight !== true && options.highlight) {
-            return options.highlight(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+            return options.highlight(code, langName, false, sourceLineString, markdownYt.options);
         }
-        if (options.highlight === true && typeof hljs !== "undefined") {
-            return highLightJs(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(code, langName, false, sourceLineString, markdownYt.options);
         }
         else if (langName) {
             return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
@@ -466,11 +475,16 @@ module.exports = function(settingOptions) {
         if (options.useCodeBlockPre) {
             return  '<pre' + sourceLineString + '>' + markdownYt.utils.escapeHtml(code) + '</pre>\n';
         }
+        else if (options.highlight !== true && options.highlight) {
+            return options.highlight(code, '', false, sourceLineString, markdownYt.options);
+        }
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(code, '', false, sourceLineString, markdownYt.options);
+        }
         else {
-            return highLightJs(code, '', false, sourceLineString, markdownYt.options.langPrefix);
-            //return  '<pre' + sourceLineString + '><code>'
-            //    + markdownYt.utils.escapeHtml(code)
-            //    + '</code></pre>\n';
+            return  '<pre' + sourceLineString + '><code>'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
         }
     };
 
