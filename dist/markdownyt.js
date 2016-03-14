@@ -10677,7 +10677,7 @@ module.exports = function(settingOptions) {
         var token = tokens[idx];
         var tag = token.type;
         var mainTag = '';
-        if(tag.match(/_open/im)) {
+        if(tag.match(/_open$/im)) {
             mainTag = tag.substr(0, tag.length - 5);
             markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) + 1;
 
@@ -10685,7 +10685,7 @@ module.exports = function(settingOptions) {
             if(options.useSourceLine && token.level == 0 && token.map != null) {
                 token.attrPush(['data-source-line', token.map[0] + 1]);
             }
-        } else if (tag.match(/_close/im)) {
+        } else if (tag.match(/_close$/im)) {
             mainTag = tag.substr(0, tag.length - 6);
             markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) - 1;
         }
