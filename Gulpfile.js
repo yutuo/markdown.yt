@@ -58,8 +58,9 @@ var dist = "dist";
 gulp.task("js", function () {
     
     return gulp.src(jsSrcs)
-        .pipe(concat("markdownyt.min.js"))
+        .pipe(concat("markdownyt.js"))
         .pipe(gulp.dest(dist))
+        .pipe(concat("markdownyt.min.js"))
         .pipe(uglify())
         .pipe(gulp.dest(dist))
         .pipe(header(headerMiniComment, {
