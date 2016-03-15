@@ -392,25 +392,29 @@ module.exports = function(settingOptions) {
         });
     }
 
-    markdownYt.tags = {};
-    markdownYt.renderer.renderToken = function(tokens, idx, options) {
-        var token = tokens[idx];
-        var tag = token.type;
-        var mainTag = '';
-        if(tag.match(/_open$/im)) {
-            mainTag = tag.substr(0, tag.length - 5);
-            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) + 1;
+    markdownYt.renderer.render = function(tokens, options, env) {
+        var i, len, type,
+            result = '',
+            rules = this.rules;
 
-            // source map
-            if(options.useSourceLine && token.level == 0 && token.map != null) {
-                token.attrPush(['data-source-line', token.map[0] + 1]);
+        for (i = 0, len = tokens.length; i < len; i++) {
+
+            if (options.useSourceLine && tokens[i].type.match(/_open$/i) && tokens[i].level === 0 && tokens[i].map != null) {
+                tokens[i].attrPush(['data-source-line', tokens[i].map[0] + 1]);
             }
-        } else if (tag.match(/_close$/im)) {
-            mainTag = tag.substr(0, tag.length - 6);
-            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) - 1;
+
+            type = tokens[i].type;
+
+            if (type === 'inline') {
+                result += this.renderInline(tokens[i].children, options, env);
+            } else if (typeof rules[type] !== 'undefined') {
+                result += rules[tokens[i].type](tokens, i, options, env, this);
+            } else {
+                result += this.renderToken(tokens, i, options, env);
+            }
         }
 
-        return markdownYt.renderer.constructor.prototype.renderToken.call(this, tokens, idx, options);
+        return result;
     };
 
     markdownYt.renderer.rules.code_inline = function(tokens, idx, options) {
@@ -445,7 +449,7 @@ module.exports = function(settingOptions) {
         var langName = token.info.trim();
         var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
 
-        if(options.useMath && /math/im.test(langName)) {
+        if(options.useMath && /math/i.test(langName)) {
             return formatMathContent(code, true, sourceLineString);
         }
 
