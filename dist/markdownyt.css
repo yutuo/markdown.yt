@@ -23,6 +23,9 @@ pre.hljs, pre.hljs code, .show-language {
 pre.hljs {
     position: relative;
     margin: 0;
+}
+
+pre.hljs code {
     white-space: pre;
 }
 
