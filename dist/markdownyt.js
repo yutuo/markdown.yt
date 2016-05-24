@@ -1,4 +1,4 @@
-/*! markdown-it 6.0.0 https://github.com//markdown-it/markdown-it @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownit = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*! markdown-it 6.0.2 https://github.com//markdown-it/markdown-it @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownit = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 // HTML5 entities map: { name -> utf16string }
 //
 'use strict';
@@ -222,7 +222,7 @@ function unescapeMd(str) {
 function unescapeAll(str) {
   if (str.indexOf('\\') < 0 && str.indexOf('&') < 0) { return str; }
 
-  return str.replace(UNESCAPE_ALL_RE, function(match, escaped, entity) {
+  return str.replace(UNESCAPE_ALL_RE, function (match, escaped, entity) {
     if (escaped) { return escaped; }
     return replaceEntityPattern(match, entity);
   });
@@ -254,7 +254,7 @@ function escapeHtml(str) {
 
 var REGEXP_ESCAPE_RE = /[.?*+^$[\]\\(){}|-]/g;
 
-function escapeRE (str) {
+function escapeRE(str) {
   return str.replace(REGEXP_ESCAPE_RE, '\\$&');
 }
 
@@ -580,7 +580,7 @@ module.exports = function parseLinkTitle(str, pos, max) {
 };
 
 },{"../common/utils":4}],9:[function(require,module,exports){
-// Main perser class
+// Main parser class
 
 'use strict';
 
@@ -1272,7 +1272,7 @@ ParserBlock.prototype.tokenize = function (state, startLine, endLine) {
 ParserBlock.prototype.parse = function (src, md, env, outTokens) {
   var state;
 
-  if (!src) { return []; }
+  if (!src) { return; }
 
   state = new this.State(src, md, env, outTokens);
 
@@ -1974,12 +1974,11 @@ Renderer.prototype.renderInline = function (tokens, options, env) {
  * instead of simple escaping.
  **/
 Renderer.prototype.renderInlineAsText = function (tokens, options, env) {
-  var result = '',
-      rules = this.rules;
+  var result = '';
 
   for (var i = 0, len = tokens.length; i < len; i++) {
     if (tokens[i].type === 'text') {
-      result += rules.text(tokens, i, options, env, this);
+      result += tokens[i].content;
     } else if (tokens[i].type === 'image') {
       result += this.renderInlineAsText(tokens[i].children, options, env);
     }
@@ -3846,9 +3845,12 @@ module.exports = function table(state, startLine, endLine, silent) {
   for (nextLine = startLine + 2; nextLine < endLine; nextLine++) {
     if (state.sCount[nextLine] < state.blkIndent) { break; }
 
-    lineText = getLine(state, nextLine).trim();
+    lineText = getLine(state, nextLine);
     if (lineText.indexOf('|') === -1) { break; }
-    columns = escapedSplit(lineText.replace(/^\||\|$/g, ''));
+
+    // keep spaces at beginning of line to indicate an empty first cell, but
+    // strip trailing whitespace
+    columns = escapedSplit(lineText.replace(/^\||\|\s*$/g, ''));
 
     token = state.push('tr_open', 'tr', 1);
     for (i = 0; i < columnCount; i++) {
@@ -4089,10 +4091,10 @@ var SCOPED_ABBR_TEST_RE = /\((c|tm|r|p)\)/i;
 
 var SCOPED_ABBR_RE = /\((c|tm|r|p)\)/ig;
 var SCOPED_ABBR = {
-  'c': '©',
-  'r': '®',
-  'p': '§',
-  'tm': '™'
+  c: '©',
+  r: '®',
+  p: '§',
+  tm: '™'
 };
 
 function replaceFn(match, name) {
@@ -4715,7 +4717,7 @@ var ESCAPED = [];
 for (var i = 0; i < 256; i++) { ESCAPED.push(0); }
 
 '\\!"#$%&\'()*+,./:;<=>?@[]^_`{|}~-'
-  .split('').forEach(function(ch) { ESCAPED[ch.charCodeAt(0)] = 1; });
+  .split('').forEach(function (ch) { ESCAPED[ch.charCodeAt(0)] = 1; });
 
 
 module.exports = function escape(state, silent) {
@@ -6284,7 +6286,7 @@ function isRegExp(obj) { return _class(obj) === '[object RegExp]'; }
 function isFunction(obj) { return _class(obj) === '[object Function]'; }
 
 
-function escapeRE (str) { return str.replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&'); }
+function escapeRE(str) { return str.replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&'); }
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -6492,7 +6494,7 @@ function compile(self) {
   // Build schema condition
   //
   var slist = Object.keys(self.__compiled__)
-                      .filter(function(name) {
+                      .filter(function (name) {
                         // Filter disabled & fake schemas
                         return name.length > 0 && self.__compiled__[name];
                       })
@@ -6776,7 +6778,7 @@ LinkifyIt.prototype.testSchemaAt = function testSchemaAt(text, schema, pos) {
  * LinkifyIt#match(text) -> Array|null
  *
  * Returns array of found link descriptions or `null` on fail. We strongly
- * to use [[LinkifyIt#test]] first, for best speed.
+ * recommend to use [[LinkifyIt#test]] first, for best speed.
  *
  * ##### Result match description
  *
@@ -6843,7 +6845,7 @@ LinkifyIt.prototype.tlds = function tlds(list, keepOld) {
 
   this.__tlds__ = this.__tlds__.concat(list)
                                   .sort()
-                                  .filter(function(el, idx, arr) {
+                                  .filter(function (el, idx, arr) {
                                     return el !== arr[idx - 1];
                                   })
                                   .reverse();
@@ -7020,7 +7022,7 @@ exports.tpl_host_fuzzy_test =
 
 exports.tpl_email_fuzzy =
 
-    '(^|>|' + src_ZCc + ')(' + src_email_name + '@' + tpl_host_fuzzy_strict + ')';
+    '(^|>|\\(|' + src_ZCc + ')(' + src_email_name + '@' + tpl_host_fuzzy_strict + ')';
 
 exports.tpl_link_fuzzy =
     // Fuzzy link can't be prepended with .:/\- and non punctuation.
@@ -8161,7 +8163,7 @@ module.exports = function deflist_plugin(md) {
 
 },{}]},{},[1])(1)
 });
-/*! markdown-it-emoji 1.1.0 https://github.com//markdown-it/markdown-it-emoji @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitEmoji = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*! markdown-it-emoji 1.1.1 https://github.com//markdown-it/markdown-it-emoji @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitEmoji = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 module.exports={
   "100": "💯",
   "1234": "🔢",
@@ -9049,7 +9051,7 @@ module.exports={
 'use strict';
 
 module.exports = {
-  mad:              [ '>:(', '>:-(' ], // angry
+  angry:            [ '>:(', '>:-(' ],
   blush:            [ ':")', ':-")' ],
   broken_heart:     [ '</3', '<\\3' ],
   // :\ and :-\ not used because of conflict with markdown escaping

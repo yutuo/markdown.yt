@@ -12,11 +12,11 @@ markdown.yt是一个基于[markdown-it](https://github.com/markdown-it/markdown-
 
 ### Dependents
 
-* [markdown-it](https://github.com/markdown-it/markdown-it)  6.0.0
+* [markdown-it](https://github.com/markdown-it/markdown-it)  6.0.2
 * [markdown-it-abbr](https://github.com/markdown-it/markdown-it-abbr) 1.0.3
 * [markdown-it-container](https://github.com/markdown-it/markdown-it-container) 2.0.0
 * [markdown-it-deflist](https://github.com/markdown-it/markdown-it-deflist) 2.0.1
-* [markdown-it-emoji](https://github.com/markdown-it/markdown-it-emoji) 1.1.0
+* [markdown-it-emoji](https://github.com/markdown-it/markdown-it-emoji) 1.1.1
 * [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) 2.0.0
 * [markdown-it-for-inline](https://github.com/markdown-it/markdown-it-for-inline) 0.1.1
 * [markdown-it-ins](https://github.com/markdown-it/markdown-it-ins) 2.0.0
@@ -25,8 +25,8 @@ markdown.yt是一个基于[markdown-it](https://github.com/markdown-it/markdown-
 * [markdown-it-sup](https://github.com/markdown-it/markdown-it-sup) 1.0.0
 * [markdown-it-simplemath](https://github.com/adam-p/markdown-it-simplemath) 1.0.0
 * [markdown-it-toc](https://github.com/tylerlong/markdown-it-toc) 0.0.8
-* [KaTeX](https://github.com/Khan/KaTeX) 0.5.1
-* [highlight.js](https://github.com/isagalaev/highlight.js) 9.2.0
+* [KaTeX](https://github.com/Khan/KaTeX) 0.6.0
+* [highlight.js](https://github.com/isagalaev/highlight.js) 9.4.0
 
 ### License
 

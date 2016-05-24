@@ -1,6 +1,6 @@
 {
   "name": "markdown.yt",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Open source markdown converter.",
   "directories": {
     "doc": "docs",
