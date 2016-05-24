@@ -34,6 +34,22 @@ var headerComment = ["/*",
 
 var headerMiniComment = "/*! <%= pkg.name %> v<%= pkg.version %> | <%= fileName(file) %> | <%= pkg.description %> | MIT License | By: <%= pkg.author %> | <%= pkg.homepage %> | <%=pkg.today('Y-m-d') %> */\r\n";
 
+var dist = "dist";
+
+var cssSrcs = [
+    "css/markdownyt.css",
+];
+
+gulp.task("css", function () {
+    return gulp.src(cssSrcs)
+        .pipe(concat("markdownyt.css"))
+        .pipe(gulp.dest(dist))
+        .pipe(concat("markdownyt.min.css"))
+        .pipe(minifycss({compatibility: 'ie8'}))
+        .pipe(gulp.dest(dist))
+        .pipe(notify({message: "markdown.yt css task complete!"}));
+});
+
 var jsSrcs = [
     "lib/markdown-it/markdown-it.js",
     "lib/markdown-it/markdown-it-abbr.js",
@@ -49,17 +65,15 @@ var jsSrcs = [
     "lib/markdown-it/markdown-it-toc.js",
     "lib/markdown-it/markdown-it-simplemath.js",
     
-    
     "src/markdownyt.js",
 ];
-
-var dist = "dist";
 
 gulp.task("js", function () {
     
     return gulp.src(jsSrcs)
-        .pipe(concat("markdownyt.min.js"))
+        .pipe(concat("markdownyt.js"))
         .pipe(gulp.dest(dist))
+        .pipe(concat("markdownyt.min.js"))
         .pipe(uglify())
         .pipe(gulp.dest(dist))
         .pipe(header(headerMiniComment, {
@@ -69,10 +83,11 @@ gulp.task("js", function () {
             }
         }))
         .pipe(gulp.dest(dist))
-        .pipe(notify({message: "markdownyt js task complete!"}));
+        .pipe(notify({message: "markdown.yt js task complete!"}));
 });
 
 
 gulp.task("default", function () {
+    gulp.run("css");
     gulp.run("js");
 });

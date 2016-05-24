@@ -7636,3 +7636,3162 @@ module.exports = require('./lib/');
 
 },{"./lib/":9}]},{},[67])(67)
 });
+/*! markdown-it-abbr 1.0.3 https://github.com//markdown-it/markdown-it-abbr @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitAbbr = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Enclose abbreviations in <abbr> tags
+//
+'use strict';
+
+
+module.exports = function sub_plugin(md) {
+  var escapeRE        = md.utils.escapeRE,
+      arrayReplaceAt  = md.utils.arrayReplaceAt;
+
+  // ASCII characters in Cc, Sc, Sm, Sk categories we should terminate on;
+  // you can check character classes here:
+  // http://www.unicode.org/Public/UNIDATA/UnicodeData.txt
+  var OTHER_CHARS      = ' \r\n$+<=>^`|~';
+
+  var UNICODE_PUNCT_RE = md.utils.lib.ucmicro.P.source;
+  var UNICODE_SPACE_RE = md.utils.lib.ucmicro.Z.source;
+
+
+  function abbr_def(state, startLine, endLine, silent) {
+    var label, title, ch, labelStart, labelEnd,
+        pos = state.bMarks[startLine] + state.tShift[startLine],
+        max = state.eMarks[startLine];
+
+    if (pos + 2 >= max) { return false; }
+
+    if (state.src.charCodeAt(pos++) !== 0x2A/* * */) { return false; }
+    if (state.src.charCodeAt(pos++) !== 0x5B/* [ */) { return false; }
+
+    labelStart = pos;
+
+    for (; pos < max; pos++) {
+      ch = state.src.charCodeAt(pos);
+      if (ch === 0x5B /* [ */) {
+        return false;
+      } else if (ch === 0x5D /* ] */) {
+        labelEnd = pos;
+        break;
+      } else if (ch === 0x5C /* \ */) {
+        pos++;
+      }
+    }
+
+    if (labelEnd < 0 || state.src.charCodeAt(labelEnd + 1) !== 0x3A/* : */) {
+      return false;
+    }
+
+    if (silent) { return true; }
+
+    label = state.src.slice(labelStart, labelEnd).replace(/\\(.)/g, '$1');
+    title = state.src.slice(labelEnd + 2, max).trim();
+    if (title.length === 0) { return false; }
+    if (!state.env.abbreviations) { state.env.abbreviations = {}; }
+    // prepend ':' to avoid conflict with Object.prototype members
+    if (typeof state.env.abbreviations[':' + label] === 'undefined') {
+      state.env.abbreviations[':' + label] = title;
+    }
+
+    state.line = startLine + 1;
+    return true;
+  }
+
+
+  function abbr_replace(state) {
+    var i, j, l, tokens, token, text, nodes, pos, reg, m, regText, regSimple,
+        currentToken,
+        blockTokens = state.tokens;
+
+    if (!state.env.abbreviations) { return; }
+
+    regSimple = new RegExp('(?:' +
+      Object.keys(state.env.abbreviations).map(function (x) {
+        return x.substr(1);
+      }).sort(function (a, b) {
+        return b.length - a.length;
+      }).map(escapeRE).join('|') +
+    ')');
+
+    regText = '(^|' + UNICODE_PUNCT_RE + '|' + UNICODE_SPACE_RE +
+                    '|[' + OTHER_CHARS.split('').map(escapeRE).join('') + '])'
+            + '(' + Object.keys(state.env.abbreviations).map(function (x) {
+                      return x.substr(1);
+                    }).sort(function (a, b) {
+                      return b.length - a.length;
+                    }).map(escapeRE).join('|') + ')'
+            + '($|' + UNICODE_PUNCT_RE + '|' + UNICODE_SPACE_RE +
+                    '|[' + OTHER_CHARS.split('').map(escapeRE).join('') + '])';
+
+    reg = new RegExp(regText, 'g');
+
+    for (j = 0, l = blockTokens.length; j < l; j++) {
+      if (blockTokens[j].type !== 'inline') { continue; }
+      tokens = blockTokens[j].children;
+
+      // We scan from the end, to keep position when new tags added.
+      for (i = tokens.length - 1; i >= 0; i--) {
+        currentToken = tokens[i];
+        if (currentToken.type !== 'text') { continue; }
+
+        pos = 0;
+        text = currentToken.content;
+        reg.lastIndex = 0;
+        nodes = [];
+
+        // fast regexp run to determine whether there are any abbreviated words
+        // in the current token
+        if (!regSimple.test(text)) { continue; }
+
+        while ((m = reg.exec(text))) {
+          if (m.index > 0 || m[1].length > 0) {
+            token         = new state.Token('text', '', 0);
+            token.content = text.slice(pos, m.index + m[1].length);
+            nodes.push(token);
+          }
+
+          token         = new state.Token('abbr_open', 'abbr', 1);
+          token.attrs   = [ [ 'title', state.env.abbreviations[':' + m[2]] ] ];
+          nodes.push(token);
+
+          token         = new state.Token('text', '', 0);
+          token.content = m[2];
+          nodes.push(token);
+
+          token         = new state.Token('abbr_close', 'abbr', -1);
+          nodes.push(token);
+
+          reg.lastIndex -= m[3].length;
+          pos = reg.lastIndex;
+        }
+
+        if (!nodes.length) { continue; }
+
+        if (pos < text.length) {
+          token         = new state.Token('text', '', 0);
+          token.content = text.slice(pos);
+          nodes.push(token);
+        }
+
+        // replace current node
+        blockTokens[j].children = tokens = arrayReplaceAt(tokens, i, nodes);
+      }
+    }
+  }
+
+  md.block.ruler.before('reference', 'abbr_def', abbr_def, { alt: [ 'paragraph', 'reference' ] });
+
+  md.core.ruler.after('linkify', 'abbr_replace', abbr_replace);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-container 2.0.0 https://github.com//markdown-it/markdown-it-container @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitContainer = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Process block-level custom containers
+//
+'use strict';
+
+
+module.exports = function container_plugin(md, name, options) {
+
+  function validateDefault(params) {
+    return params.trim().split(' ', 2)[0] === name;
+  }
+
+  function renderDefault(tokens, idx, _options, env, self) {
+
+    // add a class to the opening tag
+    if (tokens[idx].nesting === 1) {
+      tokens[idx].attrPush([ 'class', name ]);
+    }
+
+    return self.renderToken(tokens, idx, _options, env, self);
+  }
+
+  options = options || {};
+
+  var min_markers = 3,
+      marker_str  = options.marker || ':',
+      marker_char = marker_str.charCodeAt(0),
+      marker_len  = marker_str.length,
+      validate    = options.validate || validateDefault,
+      render      = options.render || renderDefault;
+
+  function container(state, startLine, endLine, silent) {
+    var pos, nextLine, marker_count, markup, params, token,
+        old_parent, old_line_max,
+        auto_closed = false,
+        start = state.bMarks[startLine] + state.tShift[startLine],
+        max = state.eMarks[startLine];
+
+    // Check out the first character quickly,
+    // this should filter out most of non-containers
+    //
+    if (marker_char !== state.src.charCodeAt(start)) { return false; }
+
+    // Check out the rest of the marker string
+    //
+    for (pos = start + 1; pos <= max; pos++) {
+      if (marker_str[(pos - start) % marker_len] !== state.src[pos]) {
+        break;
+      }
+    }
+
+    marker_count = Math.floor((pos - start) / marker_len);
+    if (marker_count < min_markers) { return false; }
+    pos -= (pos - start) % marker_len;
+
+    markup = state.src.slice(start, pos);
+    params = state.src.slice(pos, max);
+    if (!validate(params)) { return false; }
+
+    // Since start is found, we can report success here in validation mode
+    //
+    if (silent) { return true; }
+
+    // Search for the end of the block
+    //
+    nextLine = startLine;
+
+    for (;;) {
+      nextLine++;
+      if (nextLine >= endLine) {
+        // unclosed block should be autoclosed by end of document.
+        // also block seems to be autoclosed by end of parent
+        break;
+      }
+
+      start = state.bMarks[nextLine] + state.tShift[nextLine];
+      max = state.eMarks[nextLine];
+
+      if (start < max && state.sCount[nextLine] < state.blkIndent) {
+        // non-empty line with negative indent should stop the list:
+        // - ```
+        //  test
+        break;
+      }
+
+      if (marker_char !== state.src.charCodeAt(start)) { continue; }
+
+      if (state.sCount[nextLine] - state.blkIndent >= 4) {
+        // closing fence should be indented less than 4 spaces
+        continue;
+      }
+
+      for (pos = start + 1; pos <= max; pos++) {
+        if (marker_str[(pos - start) % marker_len] !== state.src[pos]) {
+          break;
+        }
+      }
+
+      // closing code fence must be at least as long as the opening one
+      if (Math.floor((pos - start) / marker_len) < marker_count) { continue; }
+
+      // make sure tail has spaces only
+      pos -= (pos - start) % marker_len;
+      pos = state.skipSpaces(pos);
+
+      if (pos < max) { continue; }
+
+      // found!
+      auto_closed = true;
+      break;
+    }
+
+    old_parent = state.parentType;
+    old_line_max = state.lineMax;
+    state.parentType = 'container';
+
+    // this will prevent lazy continuations from ever going past our end marker
+    state.lineMax = nextLine;
+
+    token        = state.push('container_' + name + '_open', 'div', 1);
+    token.markup = markup;
+    token.block  = true;
+    token.info   = params;
+    token.map    = [ startLine, nextLine ];
+
+    state.md.block.tokenize(state, startLine + 1, nextLine);
+
+    token        = state.push('container_' + name + '_close', 'div', -1);
+    token.markup = state.src.slice(start, pos);
+    token.block  = true;
+
+    state.parentType = old_parent;
+    state.lineMax = old_line_max;
+    state.line = nextLine + (auto_closed ? 1 : 0);
+
+    return true;
+  }
+
+  md.block.ruler.before('fence', 'container_' + name, container, {
+    alt: [ 'paragraph', 'reference', 'blockquote', 'list' ]
+  });
+  md.renderer.rules['container_' + name + '_open'] = render;
+  md.renderer.rules['container_' + name + '_close'] = render;
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-deflist 2.0.0 https://github.com//markdown-it/markdown-it-deflist @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitDeflist = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Process definition lists
+//
+'use strict';
+
+
+module.exports = function deflist_plugin(md) {
+  var isSpace = md.utils.isSpace;
+
+  // Search `[:~][\n ]`, returns next pos after marker on success
+  // or -1 on fail.
+  function skipMarker(state, line) {
+    var pos, marker,
+        start = state.bMarks[line] + state.tShift[line],
+        max = state.eMarks[line];
+
+    if (start >= max) { return -1; }
+
+    // Check bullet
+    marker = state.src.charCodeAt(start++);
+    if (marker !== 0x7E/* ~ */ && marker !== 0x3A/* : */) { return -1; }
+
+    pos = state.skipSpaces(start);
+
+    // require space after ":"
+    if (start === pos) { return -1; }
+
+    // no empty definitions, e.g. "  : "
+    if (pos >= max) { return -1; }
+
+    return start;
+  }
+
+  function markTightParagraphs(state, idx) {
+    var i, l,
+        level = state.level + 2;
+
+    for (i = idx + 2, l = state.tokens.length - 2; i < l; i++) {
+      if (state.tokens[i].level === level && state.tokens[i].type === 'paragraph_open') {
+        state.tokens[i + 2].hidden = true;
+        state.tokens[i].hidden = true;
+        i += 2;
+      }
+    }
+  }
+
+  function deflist(state, startLine, endLine, silent) {
+    var ch,
+        contentStart,
+        ddLine,
+        dtLine,
+        itemLines,
+        listLines,
+        listTokIdx,
+        max,
+        nextLine,
+        offset,
+        oldDDIndent,
+        oldIndent,
+        oldParentType,
+        oldSCount,
+        oldTShift,
+        oldTight,
+        pos,
+        prevEmptyEnd,
+        tight,
+        token;
+
+    if (silent) {
+      // quirk: validation mode validates a dd block only, not a whole deflist
+      if (state.ddIndent < 0) { return false; }
+      return skipMarker(state, startLine) >= 0;
+    }
+
+    nextLine = startLine + 1;
+    if (state.isEmpty(nextLine)) {
+      if (++nextLine > endLine) { return false; }
+    }
+
+    if (state.sCount[nextLine] < state.blkIndent) { return false; }
+    contentStart = skipMarker(state, nextLine);
+    if (contentStart < 0) { return false; }
+
+    // Start list
+    listTokIdx = state.tokens.length;
+
+    token     = state.push('dl_open', 'dl', 1);
+    token.map = listLines = [ startLine, 0 ];
+
+    //
+    // Iterate list items
+    //
+
+    dtLine = startLine;
+    ddLine = nextLine;
+
+    // One definition list can contain multiple DTs,
+    // and one DT can be followed by multiple DDs.
+    //
+    // Thus, there is two loops here, and label is
+    // needed to break out of the second one
+    //
+    /*eslint no-labels:0,block-scoped-var:0*/
+    OUTER:
+    for (;;) {
+      tight = true;
+      prevEmptyEnd = false;
+
+      token          = state.push('dt_open', 'dt', 1);
+      token.map      = [ dtLine, dtLine ];
+
+      token          = state.push('inline', '', 0);
+      token.map      = [ dtLine, dtLine ];
+      token.content  = state.getLines(dtLine, dtLine + 1, state.blkIndent, false).trim();
+      token.children = [];
+
+      token          = state.push('dt_close', 'dt', -1);
+
+      for (;;) {
+        token     = state.push('dd_open', 'dd', 1);
+        token.map = itemLines = [ nextLine, 0 ];
+
+        pos = contentStart;
+        max = state.eMarks[ddLine];
+        offset = state.sCount[ddLine] + contentStart - (state.bMarks[ddLine] + state.tShift[ddLine]);
+
+        while (pos < max) {
+          ch = state.src.charCodeAt(pos);
+
+          if (isSpace(ch)) {
+            if (ch === 0x09) {
+              offset += 4 - offset % 4;
+            } else {
+              offset++;
+            }
+          } else {
+            break;
+          }
+
+          pos++;
+        }
+
+        contentStart = pos;
+
+        oldTight = state.tight;
+        oldDDIndent = state.ddIndent;
+        oldIndent = state.blkIndent;
+        oldTShift = state.tShift[ddLine];
+        oldSCount = state.sCount[ddLine];
+        oldParentType = state.parentType;
+        state.blkIndent = state.ddIndent = state.sCount[ddLine] + 2;
+        state.tShift[ddLine] = contentStart - state.bMarks[ddLine];
+        state.sCount[ddLine] = offset;
+        state.tight = true;
+        state.parentType = 'deflist';
+
+        state.md.block.tokenize(state, ddLine, endLine, true);
+
+        // If any of list item is tight, mark list as tight
+        if (!state.tight || prevEmptyEnd) {
+          tight = false;
+        }
+        // Item become loose if finish with empty line,
+        // but we should filter last element, because it means list finish
+        prevEmptyEnd = (state.line - ddLine) > 1 && state.isEmpty(state.line - 1);
+
+        state.tShift[ddLine] = oldTShift;
+        state.sCount[ddLine] = oldSCount;
+        state.tight = oldTight;
+        state.parentType = oldParentType;
+        state.blkIndent = oldIndent;
+        state.ddIndent = oldDDIndent;
+
+        token = state.push('dd_close', 'dd', -1);
+
+        itemLines[1] = nextLine = state.line;
+
+        if (nextLine >= endLine) { break OUTER; }
+
+        if (state.sCount[nextLine] < state.blkIndent) { break OUTER; }
+        contentStart = skipMarker(state, nextLine);
+        if (contentStart < 0) { break; }
+
+        ddLine = nextLine;
+
+        // go to the next loop iteration:
+        // insert DD tag and repeat checking
+      }
+
+      if (nextLine >= endLine) { break; }
+      dtLine = nextLine;
+
+      if (state.isEmpty(dtLine)) { break; }
+      if (state.sCount[dtLine] < state.blkIndent) { break; }
+
+      ddLine = dtLine + 1;
+      if (ddLine >= endLine) { break; }
+      if (state.isEmpty(ddLine)) { ddLine++; }
+      if (ddLine >= endLine) { break; }
+
+      if (state.sCount[ddLine] < state.blkIndent) { break; }
+      contentStart = skipMarker(state, ddLine);
+      if (contentStart < 0) { break; }
+
+      // go to the next loop iteration:
+      // insert DT and DD tags and repeat checking
+    }
+
+    // Finilize list
+    token = state.push('dl_close', 'dl', -1);
+
+    listLines[1] = nextLine;
+
+    state.line = nextLine;
+
+    // mark paragraphs tight if needed
+    if (tight) {
+      markTightParagraphs(state, listTokIdx);
+    }
+
+    return true;
+  }
+
+
+  md.block.ruler.before('paragraph', 'deflist', deflist, { alt: [ 'paragraph', 'reference' ] });
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-emoji 1.1.1 https://github.com//markdown-it/markdown-it-emoji @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitEmoji = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+module.exports={
+  "100": "💯",
+  "1234": "🔢",
+  "smile": "😄",
+  "smiley": "😃",
+  "grinning": "😀",
+  "blush": "😊",
+  "relaxed": "☺️",
+  "wink": "😉",
+  "heart_eyes": "😍",
+  "kissing_heart": "😘",
+  "kissing_closed_eyes": "😚",
+  "kissing": "😗",
+  "kissing_smiling_eyes": "😙",
+  "stuck_out_tongue_winking_eye": "😜",
+  "stuck_out_tongue_closed_eyes": "😝",
+  "stuck_out_tongue": "😛",
+  "flushed": "😳",
+  "grin": "😁",
+  "pensive": "😔",
+  "relieved": "😌",
+  "unamused": "😒",
+  "disappointed": "😞",
+  "persevere": "😣",
+  "cry": "😢",
+  "joy": "😂",
+  "sob": "😭",
+  "sleepy": "😪",
+  "disappointed_relieved": "😥",
+  "cold_sweat": "😰",
+  "sweat_smile": "😅",
+  "sweat": "😓",
+  "weary": "😩",
+  "tired_face": "😫",
+  "fearful": "😨",
+  "scream": "😱",
+  "angry": "😠",
+  "rage": "😡",
+  "triumph": "😤",
+  "confounded": "😖",
+  "laughing": "😆",
+  "satisfied": "😆",
+  "yum": "😋",
+  "mask": "😷",
+  "sunglasses": "😎",
+  "sleeping": "😴",
+  "dizzy_face": "😵",
+  "astonished": "😲",
+  "worried": "😟",
+  "frowning": "😦",
+  "anguished": "😧",
+  "smiling_imp": "😈",
+  "imp": "👿",
+  "open_mouth": "😮",
+  "grimacing": "😬",
+  "neutral_face": "😐",
+  "confused": "😕",
+  "hushed": "😯",
+  "no_mouth": "😶",
+  "innocent": "😇",
+  "smirk": "😏",
+  "expressionless": "😑",
+  "man_with_gua_pi_mao": "👲",
+  "man_with_turban": "👳",
+  "cop": "👮",
+  "construction_worker": "👷",
+  "guardsman": "💂",
+  "baby": "👶",
+  "boy": "👦",
+  "girl": "👧",
+  "man": "👨",
+  "woman": "👩",
+  "older_man": "👴",
+  "older_woman": "👵",
+  "person_with_blond_hair": "👱",
+  "angel": "👼",
+  "princess": "👸",
+  "smiley_cat": "😺",
+  "smile_cat": "😸",
+  "heart_eyes_cat": "😻",
+  "kissing_cat": "😽",
+  "smirk_cat": "😼",
+  "scream_cat": "🙀",
+  "crying_cat_face": "😿",
+  "joy_cat": "😹",
+  "pouting_cat": "😾",
+  "japanese_ogre": "👹",
+  "japanese_goblin": "👺",
+  "see_no_evil": "🙈",
+  "hear_no_evil": "🙉",
+  "speak_no_evil": "🙊",
+  "skull": "💀",
+  "alien": "👽",
+  "hankey": "💩",
+  "poop": "💩",
+  "shit": "💩",
+  "fire": "🔥",
+  "sparkles": "✨",
+  "star2": "🌟",
+  "dizzy": "💫",
+  "boom": "💥",
+  "collision": "💥",
+  "anger": "💢",
+  "sweat_drops": "💦",
+  "droplet": "💧",
+  "zzz": "💤",
+  "dash": "💨",
+  "ear": "👂",
+  "eyes": "👀",
+  "nose": "👃",
+  "tongue": "👅",
+  "lips": "👄",
+  "+1": "👍",
+  "thumbsup": "👍",
+  "-1": "👎",
+  "thumbsdown": "👎",
+  "ok_hand": "👌",
+  "facepunch": "👊",
+  "punch": "👊",
+  "fist": "✊",
+  "v": "✌️",
+  "wave": "👋",
+  "hand": "✋",
+  "raised_hand": "✋",
+  "open_hands": "👐",
+  "point_up_2": "👆",
+  "point_down": "👇",
+  "point_right": "👉",
+  "point_left": "👈",
+  "raised_hands": "🙌",
+  "pray": "🙏",
+  "point_up": "☝️",
+  "clap": "👏",
+  "muscle": "💪",
+  "walking": "🚶",
+  "runner": "🏃",
+  "running": "🏃",
+  "dancer": "💃",
+  "couple": "👫",
+  "family": "👪",
+  "two_men_holding_hands": "👬",
+  "two_women_holding_hands": "👭",
+  "couplekiss": "💏",
+  "couple_with_heart": "💑",
+  "dancers": "👯",
+  "ok_woman": "🙆",
+  "no_good": "🙅",
+  "information_desk_person": "💁",
+  "raising_hand": "🙋",
+  "massage": "💆",
+  "haircut": "💇",
+  "nail_care": "💅",
+  "bride_with_veil": "👰",
+  "person_with_pouting_face": "🙎",
+  "person_frowning": "🙍",
+  "bow": "🙇",
+  "tophat": "🎩",
+  "crown": "👑",
+  "womans_hat": "👒",
+  "athletic_shoe": "👟",
+  "mans_shoe": "👞",
+  "shoe": "👞",
+  "sandal": "👡",
+  "high_heel": "👠",
+  "boot": "👢",
+  "shirt": "👕",
+  "tshirt": "👕",
+  "necktie": "👔",
+  "womans_clothes": "👚",
+  "dress": "👗",
+  "running_shirt_with_sash": "🎽",
+  "jeans": "👖",
+  "kimono": "👘",
+  "bikini": "👙",
+  "briefcase": "💼",
+  "handbag": "👜",
+  "pouch": "👝",
+  "purse": "👛",
+  "eyeglasses": "👓",
+  "ribbon": "🎀",
+  "closed_umbrella": "🌂",
+  "lipstick": "💄",
+  "yellow_heart": "💛",
+  "blue_heart": "💙",
+  "purple_heart": "💜",
+  "green_heart": "💚",
+  "heart": "❤️",
+  "broken_heart": "💔",
+  "heartpulse": "💗",
+  "heartbeat": "💓",
+  "two_hearts": "💕",
+  "sparkling_heart": "💖",
+  "revolving_hearts": "💞",
+  "cupid": "💘",
+  "love_letter": "💌",
+  "kiss": "💋",
+  "ring": "💍",
+  "gem": "💎",
+  "bust_in_silhouette": "👤",
+  "busts_in_silhouette": "👥",
+  "speech_balloon": "💬",
+  "footprints": "👣",
+  "thought_balloon": "💭",
+  "dog": "🐶",
+  "wolf": "🐺",
+  "cat": "🐱",
+  "mouse": "🐭",
+  "hamster": "🐹",
+  "rabbit": "🐰",
+  "frog": "🐸",
+  "tiger": "🐯",
+  "koala": "🐨",
+  "bear": "🐻",
+  "pig": "🐷",
+  "pig_nose": "🐽",
+  "cow": "🐮",
+  "boar": "🐗",
+  "monkey_face": "🐵",
+  "monkey": "🐒",
+  "horse": "🐴",
+  "sheep": "🐑",
+  "elephant": "🐘",
+  "panda_face": "🐼",
+  "penguin": "🐧",
+  "bird": "🐦",
+  "baby_chick": "🐤",
+  "hatched_chick": "🐥",
+  "hatching_chick": "🐣",
+  "chicken": "🐔",
+  "snake": "🐍",
+  "turtle": "🐢",
+  "bug": "🐛",
+  "bee": "🐝",
+  "honeybee": "🐝",
+  "ant": "🐜",
+  "beetle": "🐞",
+  "snail": "🐌",
+  "octopus": "🐙",
+  "shell": "🐚",
+  "tropical_fish": "🐠",
+  "fish": "🐟",
+  "dolphin": "🐬",
+  "flipper": "🐬",
+  "whale": "🐳",
+  "whale2": "🐋",
+  "cow2": "🐄",
+  "ram": "🐏",
+  "rat": "🐀",
+  "water_buffalo": "🐃",
+  "tiger2": "🐅",
+  "rabbit2": "🐇",
+  "dragon": "🐉",
+  "racehorse": "🐎",
+  "goat": "🐐",
+  "rooster": "🐓",
+  "dog2": "🐕",
+  "pig2": "🐖",
+  "mouse2": "🐁",
+  "ox": "🐂",
+  "dragon_face": "🐲",
+  "blowfish": "🐡",
+  "crocodile": "🐊",
+  "camel": "🐫",
+  "dromedary_camel": "🐪",
+  "leopard": "🐆",
+  "cat2": "🐈",
+  "poodle": "🐩",
+  "feet": "🐾",
+  "paw_prints": "🐾",
+  "bouquet": "💐",
+  "cherry_blossom": "🌸",
+  "tulip": "🌷",
+  "four_leaf_clover": "🍀",
+  "rose": "🌹",
+  "sunflower": "🌻",
+  "hibiscus": "🌺",
+  "maple_leaf": "🍁",
+  "leaves": "🍃",
+  "fallen_leaf": "🍂",
+  "herb": "🌿",
+  "ear_of_rice": "🌾",
+  "mushroom": "🍄",
+  "cactus": "🌵",
+  "palm_tree": "🌴",
+  "evergreen_tree": "🌲",
+  "deciduous_tree": "🌳",
+  "chestnut": "🌰",
+  "seedling": "🌱",
+  "blossom": "🌼",
+  "globe_with_meridians": "🌐",
+  "sun_with_face": "🌞",
+  "full_moon_with_face": "🌝",
+  "new_moon_with_face": "🌚",
+  "new_moon": "🌑",
+  "waxing_crescent_moon": "🌒",
+  "first_quarter_moon": "🌓",
+  "moon": "🌔",
+  "waxing_gibbous_moon": "🌔",
+  "full_moon": "🌕",
+  "waning_gibbous_moon": "🌖",
+  "last_quarter_moon": "🌗",
+  "waning_crescent_moon": "🌘",
+  "last_quarter_moon_with_face": "🌜",
+  "first_quarter_moon_with_face": "🌛",
+  "crescent_moon": "🌙",
+  "earth_africa": "🌍",
+  "earth_americas": "🌎",
+  "earth_asia": "🌏",
+  "volcano": "🌋",
+  "milky_way": "🌌",
+  "stars": "🌠",
+  "star": "⭐",
+  "sunny": "☀️",
+  "partly_sunny": "⛅",
+  "cloud": "☁️",
+  "zap": "⚡",
+  "umbrella": "☔",
+  "snowflake": "❄️",
+  "snowman": "⛄",
+  "cyclone": "🌀",
+  "foggy": "🌁",
+  "rainbow": "🌈",
+  "ocean": "🌊",
+  "bamboo": "🎍",
+  "gift_heart": "💝",
+  "dolls": "🎎",
+  "school_satchel": "🎒",
+  "mortar_board": "🎓",
+  "flags": "🎏",
+  "fireworks": "🎆",
+  "sparkler": "🎇",
+  "wind_chime": "🎐",
+  "rice_scene": "🎑",
+  "jack_o_lantern": "🎃",
+  "ghost": "👻",
+  "santa": "🎅",
+  "christmas_tree": "🎄",
+  "gift": "🎁",
+  "tanabata_tree": "🎋",
+  "tada": "🎉",
+  "confetti_ball": "🎊",
+  "balloon": "🎈",
+  "crossed_flags": "🎌",
+  "crystal_ball": "🔮",
+  "movie_camera": "🎥",
+  "camera": "📷",
+  "video_camera": "📹",
+  "vhs": "📼",
+  "cd": "💿",
+  "dvd": "📀",
+  "minidisc": "💽",
+  "floppy_disk": "💾",
+  "computer": "💻",
+  "iphone": "📱",
+  "phone": "☎️",
+  "telephone": "☎️",
+  "telephone_receiver": "📞",
+  "pager": "📟",
+  "fax": "📠",
+  "satellite": "📡",
+  "tv": "📺",
+  "radio": "📻",
+  "loud_sound": "🔊",
+  "sound": "🔉",
+  "speaker": "🔈",
+  "mute": "🔇",
+  "bell": "🔔",
+  "no_bell": "🔕",
+  "loudspeaker": "📢",
+  "mega": "📣",
+  "hourglass_flowing_sand": "⏳",
+  "hourglass": "⌛",
+  "alarm_clock": "⏰",
+  "watch": "⌚",
+  "unlock": "🔓",
+  "lock": "🔒",
+  "lock_with_ink_pen": "🔏",
+  "closed_lock_with_key": "🔐",
+  "key": "🔑",
+  "mag_right": "🔎",
+  "bulb": "💡",
+  "flashlight": "🔦",
+  "high_brightness": "🔆",
+  "low_brightness": "🔅",
+  "electric_plug": "🔌",
+  "battery": "🔋",
+  "mag": "🔍",
+  "bathtub": "🛁",
+  "bath": "🛀",
+  "shower": "🚿",
+  "toilet": "🚽",
+  "wrench": "🔧",
+  "nut_and_bolt": "🔩",
+  "hammer": "🔨",
+  "door": "🚪",
+  "smoking": "🚬",
+  "bomb": "💣",
+  "gun": "🔫",
+  "hocho": "🔪",
+  "knife": "🔪",
+  "pill": "💊",
+  "syringe": "💉",
+  "moneybag": "💰",
+  "yen": "💴",
+  "dollar": "💵",
+  "pound": "💷",
+  "euro": "💶",
+  "credit_card": "💳",
+  "money_with_wings": "💸",
+  "calling": "📲",
+  "e-mail": "📧",
+  "inbox_tray": "📥",
+  "outbox_tray": "📤",
+  "email": "✉️",
+  "envelope": "✉️",
+  "envelope_with_arrow": "📩",
+  "incoming_envelope": "📨",
+  "postal_horn": "📯",
+  "mailbox": "📫",
+  "mailbox_closed": "📪",
+  "mailbox_with_mail": "📬",
+  "mailbox_with_no_mail": "📭",
+  "postbox": "📮",
+  "package": "📦",
+  "memo": "📝",
+  "pencil": "📝",
+  "page_facing_up": "📄",
+  "page_with_curl": "📃",
+  "bookmark_tabs": "📑",
+  "bar_chart": "📊",
+  "chart_with_upwards_trend": "📈",
+  "chart_with_downwards_trend": "📉",
+  "scroll": "📜",
+  "clipboard": "📋",
+  "date": "📅",
+  "calendar": "📆",
+  "card_index": "📇",
+  "file_folder": "📁",
+  "open_file_folder": "📂",
+  "scissors": "✂️",
+  "pushpin": "📌",
+  "paperclip": "📎",
+  "black_nib": "✒️",
+  "pencil2": "✏️",
+  "straight_ruler": "📏",
+  "triangular_ruler": "📐",
+  "closed_book": "📕",
+  "green_book": "📗",
+  "blue_book": "📘",
+  "orange_book": "📙",
+  "notebook": "📓",
+  "notebook_with_decorative_cover": "📔",
+  "ledger": "📒",
+  "books": "📚",
+  "book": "📖",
+  "open_book": "📖",
+  "bookmark": "🔖",
+  "name_badge": "📛",
+  "microscope": "🔬",
+  "telescope": "🔭",
+  "newspaper": "📰",
+  "art": "🎨",
+  "clapper": "🎬",
+  "microphone": "🎤",
+  "headphones": "🎧",
+  "musical_score": "🎼",
+  "musical_note": "🎵",
+  "notes": "🎶",
+  "musical_keyboard": "🎹",
+  "violin": "🎻",
+  "trumpet": "🎺",
+  "saxophone": "🎷",
+  "guitar": "🎸",
+  "space_invader": "👾",
+  "video_game": "🎮",
+  "black_joker": "🃏",
+  "flower_playing_cards": "🎴",
+  "mahjong": "🀄",
+  "game_die": "🎲",
+  "dart": "🎯",
+  "football": "🏈",
+  "basketball": "🏀",
+  "soccer": "⚽",
+  "baseball": "⚾️",
+  "tennis": "🎾",
+  "8ball": "🎱",
+  "rugby_football": "🏉",
+  "bowling": "🎳",
+  "golf": "⛳",
+  "mountain_bicyclist": "🚵",
+  "bicyclist": "🚴",
+  "checkered_flag": "🏁",
+  "horse_racing": "🏇",
+  "trophy": "🏆",
+  "ski": "🎿",
+  "snowboarder": "🏂",
+  "swimmer": "🏊",
+  "surfer": "🏄",
+  "fishing_pole_and_fish": "🎣",
+  "coffee": "☕",
+  "tea": "🍵",
+  "sake": "🍶",
+  "baby_bottle": "🍼",
+  "beer": "🍺",
+  "beers": "🍻",
+  "cocktail": "🍸",
+  "tropical_drink": "🍹",
+  "wine_glass": "🍷",
+  "fork_and_knife": "🍴",
+  "pizza": "🍕",
+  "hamburger": "🍔",
+  "fries": "🍟",
+  "poultry_leg": "🍗",
+  "meat_on_bone": "🍖",
+  "spaghetti": "🍝",
+  "curry": "🍛",
+  "fried_shrimp": "🍤",
+  "bento": "🍱",
+  "sushi": "🍣",
+  "fish_cake": "🍥",
+  "rice_ball": "🍙",
+  "rice_cracker": "🍘",
+  "rice": "🍚",
+  "ramen": "🍜",
+  "stew": "🍲",
+  "oden": "🍢",
+  "dango": "🍡",
+  "egg": "🍳",
+  "bread": "🍞",
+  "doughnut": "🍩",
+  "custard": "🍮",
+  "icecream": "🍦",
+  "ice_cream": "🍨",
+  "shaved_ice": "🍧",
+  "birthday": "🎂",
+  "cake": "🍰",
+  "cookie": "🍪",
+  "chocolate_bar": "🍫",
+  "candy": "🍬",
+  "lollipop": "🍭",
+  "honey_pot": "🍯",
+  "apple": "🍎",
+  "green_apple": "🍏",
+  "tangerine": "🍊",
+  "lemon": "🍋",
+  "cherries": "🍒",
+  "grapes": "🍇",
+  "watermelon": "🍉",
+  "strawberry": "🍓",
+  "peach": "🍑",
+  "melon": "🍈",
+  "banana": "🍌",
+  "pear": "🍐",
+  "pineapple": "🍍",
+  "sweet_potato": "🍠",
+  "eggplant": "🍆",
+  "tomato": "🍅",
+  "corn": "🌽",
+  "house": "🏠",
+  "house_with_garden": "🏡",
+  "school": "🏫",
+  "office": "🏢",
+  "post_office": "🏣",
+  "hospital": "🏥",
+  "bank": "🏦",
+  "convenience_store": "🏪",
+  "love_hotel": "🏩",
+  "hotel": "🏨",
+  "wedding": "💒",
+  "church": "⛪",
+  "department_store": "🏬",
+  "european_post_office": "🏤",
+  "city_sunrise": "🌇",
+  "city_sunset": "🌆",
+  "japanese_castle": "🏯",
+  "european_castle": "🏰",
+  "tent": "⛺",
+  "factory": "🏭",
+  "tokyo_tower": "🗼",
+  "japan": "🗾",
+  "mount_fuji": "🗻",
+  "sunrise_over_mountains": "🌄",
+  "sunrise": "🌅",
+  "night_with_stars": "🌃",
+  "statue_of_liberty": "🗽",
+  "bridge_at_night": "🌉",
+  "carousel_horse": "🎠",
+  "ferris_wheel": "🎡",
+  "fountain": "⛲",
+  "roller_coaster": "🎢",
+  "ship": "🚢",
+  "boat": "⛵",
+  "sailboat": "⛵",
+  "speedboat": "🚤",
+  "rowboat": "🚣",
+  "anchor": "⚓",
+  "rocket": "🚀",
+  "airplane": "✈️",
+  "seat": "💺",
+  "helicopter": "🚁",
+  "steam_locomotive": "🚂",
+  "tram": "🚊",
+  "station": "🚉",
+  "mountain_railway": "🚞",
+  "train2": "🚆",
+  "bullettrain_side": "🚄",
+  "bullettrain_front": "🚅",
+  "light_rail": "🚈",
+  "metro": "🚇",
+  "monorail": "🚝",
+  "train": "🚋",
+  "railway_car": "🚃",
+  "trolleybus": "🚎",
+  "bus": "🚌",
+  "oncoming_bus": "🚍",
+  "blue_car": "🚙",
+  "oncoming_automobile": "🚘",
+  "car": "🚗",
+  "red_car": "🚗",
+  "taxi": "🚕",
+  "oncoming_taxi": "🚖",
+  "articulated_lorry": "🚛",
+  "truck": "🚚",
+  "rotating_light": "🚨",
+  "police_car": "🚓",
+  "oncoming_police_car": "🚔",
+  "fire_engine": "🚒",
+  "ambulance": "🚑",
+  "minibus": "🚐",
+  "bike": "🚲",
+  "aerial_tramway": "🚡",
+  "suspension_railway": "🚟",
+  "mountain_cableway": "🚠",
+  "tractor": "🚜",
+  "barber": "💈",
+  "busstop": "🚏",
+  "ticket": "🎫",
+  "vertical_traffic_light": "🚦",
+  "traffic_light": "🚥",
+  "warning": "⚠️",
+  "construction": "🚧",
+  "beginner": "🔰",
+  "fuelpump": "⛽",
+  "izakaya_lantern": "🏮",
+  "lantern": "🏮",
+  "slot_machine": "🎰",
+  "hotsprings": "♨️",
+  "moyai": "🗿",
+  "circus_tent": "🎪",
+  "performing_arts": "🎭",
+  "round_pushpin": "📍",
+  "triangular_flag_on_post": "🚩",
+  "jp": "🇯🇵",
+  "kr": "🇰🇷",
+  "de": "🇩🇪",
+  "cn": "🇨🇳",
+  "us": "🇺🇸",
+  "fr": "🇫🇷",
+  "es": "🇪🇸",
+  "it": "🇮🇹",
+  "ru": "🇷🇺",
+  "gb": "🇬🇧",
+  "uk": "🇬🇧",
+  "one": "1️⃣",
+  "two": "2️⃣",
+  "three": "3️⃣",
+  "four": "4️⃣",
+  "five": "5️⃣",
+  "six": "6️⃣",
+  "seven": "7️⃣",
+  "eight": "8️⃣",
+  "nine": "9️⃣",
+  "zero": "0️⃣",
+  "keycap_ten": "🔟",
+  "hash": "#️⃣",
+  "symbols": "🔣",
+  "arrow_up": "⬆️",
+  "arrow_down": "⬇️",
+  "arrow_left": "⬅️",
+  "arrow_right": "➡️",
+  "capital_abcd": "🔠",
+  "abcd": "🔡",
+  "abc": "🔤",
+  "arrow_upper_right": "↗️",
+  "arrow_upper_left": "↖️",
+  "arrow_lower_right": "↘️",
+  "arrow_lower_left": "↙️",
+  "left_right_arrow": "↔️",
+  "arrow_up_down": "↕️",
+  "arrows_counterclockwise": "🔄",
+  "arrow_backward": "◀️",
+  "arrow_forward": "▶️",
+  "arrow_up_small": "🔼",
+  "arrow_down_small": "🔽",
+  "leftwards_arrow_with_hook": "↩️",
+  "arrow_right_hook": "↪️",
+  "information_source": "ℹ️",
+  "rewind": "⏪",
+  "fast_forward": "⏩",
+  "arrow_double_up": "⏫",
+  "arrow_double_down": "⏬",
+  "arrow_heading_down": "⤵️",
+  "arrow_heading_up": "⤴️",
+  "ok": "🆗",
+  "twisted_rightwards_arrows": "🔀",
+  "repeat": "🔁",
+  "repeat_one": "🔂",
+  "new": "🆕",
+  "up": "🆙",
+  "cool": "🆒",
+  "free": "🆓",
+  "ng": "🆖",
+  "signal_strength": "📶",
+  "cinema": "🎦",
+  "koko": "🈁",
+  "u6307": "🈯",
+  "u7a7a": "🈳",
+  "u6e80": "🈵",
+  "u5408": "🈴",
+  "u7981": "🈲",
+  "ideograph_advantage": "🉐",
+  "u5272": "🈹",
+  "u55b6": "🈺",
+  "u6709": "🈶",
+  "u7121": "🈚",
+  "restroom": "🚻",
+  "mens": "🚹",
+  "womens": "🚺",
+  "baby_symbol": "🚼",
+  "wc": "🚾",
+  "potable_water": "🚰",
+  "put_litter_in_its_place": "🚮",
+  "parking": "🅿️",
+  "wheelchair": "♿",
+  "no_smoking": "🚭",
+  "u6708": "🈷️",
+  "u7533": "🈸",
+  "sa": "🈂️",
+  "m": "Ⓜ️",
+  "passport_control": "🛂",
+  "baggage_claim": "🛄",
+  "left_luggage": "🛅",
+  "customs": "🛃",
+  "accept": "🉑",
+  "secret": "㊙️",
+  "congratulations": "㊗️",
+  "cl": "🆑",
+  "sos": "🆘",
+  "id": "🆔",
+  "no_entry_sign": "🚫",
+  "underage": "🔞",
+  "no_mobile_phones": "📵",
+  "do_not_litter": "🚯",
+  "non-potable_water": "🚱",
+  "no_bicycles": "🚳",
+  "no_pedestrians": "🚷",
+  "children_crossing": "🚸",
+  "no_entry": "⛔",
+  "eight_spoked_asterisk": "✳️",
+  "sparkle": "❇️",
+  "negative_squared_cross_mark": "❎",
+  "white_check_mark": "✅",
+  "eight_pointed_black_star": "✴️",
+  "heart_decoration": "💟",
+  "vs": "🆚",
+  "vibration_mode": "📳",
+  "mobile_phone_off": "📴",
+  "a": "🅰️",
+  "b": "🅱️",
+  "ab": "🆎",
+  "o2": "🅾️",
+  "diamond_shape_with_a_dot_inside": "💠",
+  "loop": "➿",
+  "recycle": "♻️",
+  "aries": "♈",
+  "taurus": "♉",
+  "gemini": "♊",
+  "cancer": "♋",
+  "leo": "♌",
+  "virgo": "♍",
+  "libra": "♎",
+  "scorpius": "♏",
+  "sagittarius": "♐",
+  "capricorn": "♑",
+  "aquarius": "♒",
+  "pisces": "♓",
+  "ophiuchus": "⛎",
+  "six_pointed_star": "🔯",
+  "atm": "🏧",
+  "chart": "💹",
+  "heavy_dollar_sign": "💲",
+  "currency_exchange": "💱",
+  "copyright": "©️",
+  "registered": "®️",
+  "tm": "™️",
+  "x": "❌",
+  "bangbang": "‼️",
+  "interrobang": "⁉️",
+  "exclamation": "❗",
+  "heavy_exclamation_mark": "❗",
+  "question": "❓",
+  "grey_exclamation": "❕",
+  "grey_question": "❔",
+  "o": "⭕",
+  "top": "🔝",
+  "end": "🔚",
+  "back": "🔙",
+  "on": "🔛",
+  "soon": "🔜",
+  "arrows_clockwise": "🔃",
+  "clock12": "🕛",
+  "clock1230": "🕧",
+  "clock1": "🕐",
+  "clock130": "🕜",
+  "clock2": "🕑",
+  "clock230": "🕝",
+  "clock3": "🕒",
+  "clock330": "🕞",
+  "clock4": "🕓",
+  "clock430": "🕟",
+  "clock5": "🕔",
+  "clock530": "🕠",
+  "clock6": "🕕",
+  "clock7": "🕖",
+  "clock8": "🕗",
+  "clock9": "🕘",
+  "clock10": "🕙",
+  "clock11": "🕚",
+  "clock630": "🕡",
+  "clock730": "🕢",
+  "clock830": "🕣",
+  "clock930": "🕤",
+  "clock1030": "🕥",
+  "clock1130": "🕦",
+  "heavy_multiplication_x": "✖️",
+  "heavy_plus_sign": "➕",
+  "heavy_minus_sign": "➖",
+  "heavy_division_sign": "➗",
+  "spades": "♠️",
+  "hearts": "♥️",
+  "clubs": "♣️",
+  "diamonds": "♦️",
+  "white_flower": "💮",
+  "heavy_check_mark": "✔️",
+  "ballot_box_with_check": "☑️",
+  "radio_button": "🔘",
+  "link": "🔗",
+  "curly_loop": "➰",
+  "wavy_dash": "〰️",
+  "part_alternation_mark": "〽️",
+  "trident": "🔱",
+  "black_medium_square": "◼️",
+  "white_medium_square": "◻️",
+  "black_medium_small_square": "◾",
+  "white_medium_small_square": "◽",
+  "black_small_square": "▪️",
+  "white_small_square": "▫️",
+  "small_red_triangle": "🔺",
+  "black_square_button": "🔲",
+  "white_square_button": "🔳",
+  "black_circle": "⚫",
+  "white_circle": "⚪",
+  "red_circle": "🔴",
+  "large_blue_circle": "🔵",
+  "small_red_triangle_down": "🔻",
+  "white_large_square": "⬜",
+  "black_large_square": "⬛",
+  "large_orange_diamond": "🔶",
+  "large_blue_diamond": "🔷",
+  "small_orange_diamond": "🔸",
+  "small_blue_diamond": "🔹"
+}
+},{}],2:[function(require,module,exports){
+// Emoticons -> Emoji mapping.
+//
+// (!) Some patterns skipped, to avoid collisions
+// without increase matcher complicity. Than can change in future.
+//
+// Places to look for more emoticons info:
+//
+// - http://en.wikipedia.org/wiki/List_of_emoticons#Western
+// - https://github.com/wooorm/emoticon/blob/master/Support.md
+// - http://factoryjoe.com/projects/emoticons/
+//
+'use strict';
+
+module.exports = {
+  angry:            [ '>:(', '>:-(' ],
+  blush:            [ ':")', ':-")' ],
+  broken_heart:     [ '</3', '<\\3' ],
+  // :\ and :-\ not used because of conflict with markdown escaping
+  confused:         [ ':/', ':-/' ], // twemoji shows question
+  cry:              [ ":'(", ":'-(", ':,(', ':,-(' ],
+  frowning:         [ ':(', ':-(' ],
+  heart:            [ '<3' ],
+  imp:              [ ']:(', ']:-(' ],
+  innocent:         [ 'o:)', 'O:)', 'o:-)', 'O:-)', '0:)', '0:-)' ],
+  joy:              [ ":')", ":'-)", ':,)', ':,-)', ":'D", ":'-D", ':,D', ':,-D' ],
+  kissing:          [ ':*', ':-*' ],
+  laughing:         [ 'x-)', 'X-)' ],
+  neutral_face:     [ ':|', ':-|' ],
+  open_mouth:       [ ':o', ':-o', ':O', ':-O' ],
+  rage:             [ ':@', ':-@' ],
+  smile:            [ ':D', ':-D' ],
+  smiley:           [ ':)', ':-)' ],
+  smiling_imp:      [ ']:)', ']:-)' ],
+  sob:              [ ":,'(", ":,'-(", ';(', ';-(' ],
+  stuck_out_tongue: [ ':P', ':-P' ],
+  sunglasses:       [ '8-)', 'B-)' ],
+  sweat:            [ ',:(', ',:-(' ],
+  sweat_smile:      [ ',:)', ',:-)' ],
+  unamused:         [ ':s', ':-S', ':z', ':-Z', ':$', ':-$' ],
+  wink:             [ ';)', ';-)' ]
+};
+
+},{}],3:[function(require,module,exports){
+// Convert input options to more useable format
+// and compile search regexp
+
+'use strict';
+
+
+function quoteRE (str) {
+  return str.replace(/[.?*+^$[\]\\(){}|-]/g, '\\$&');
+}
+
+
+module.exports = function normalize_opts(options) {
+  var emojies = options.defs,
+      shortcuts;
+
+  // Filter emojies by whitelist, if needed
+  if (options.enabled.length) {
+    emojies = Object.keys(emojies).reduce(function (acc, key) {
+      if (options.enabled.indexOf(key) >= 0) {
+        acc[key] = emojies[key];
+      }
+      return acc;
+    }, {});
+  }
+
+  // Flatten shortcuts to simple object: { alias: emoji_name }
+  shortcuts = Object.keys(options.shortcuts).reduce(function (acc, key) {
+    // Skip aliases for filtered emojies, to reduce regexp
+    if (!emojies[key]) { return acc; }
+
+    if (Array.isArray(options.shortcuts[key])) {
+      options.shortcuts[key].forEach(function (alias) {
+        acc[alias] = key;
+      });
+      return acc;
+    }
+
+    acc[options.shortcuts[key]] = key;
+    return acc;
+  }, {});
+
+  // Compile regexp
+  var names = Object.keys(emojies)
+                .map(function (name) { return ':' + name + ':'; })
+                .concat(Object.keys(shortcuts))
+                .sort()
+                .reverse()
+                .map(function (name) { return quoteRE(name); })
+                .join('|');
+  var scanRE = RegExp(names, 'g');
+
+
+  return {
+    defs: emojies,
+    shortcuts: shortcuts,
+    scanRE: scanRE
+  };
+};
+
+},{}],4:[function(require,module,exports){
+'use strict';
+
+module.exports = function emoji_html(tokens, idx /*, options, env */) {
+  return tokens[idx].content;
+};
+
+},{}],5:[function(require,module,exports){
+// Emojies & shortcuts replacement logic.
+//
+// Note: In theory, it could be faster to parse :smile: in inline chain and
+// leave only shortcuts here. But, who care...
+//
+
+'use strict';
+
+
+module.exports = function create_rule(md, emojies, shortcuts, compiledRE) {
+  var arrayReplaceAt = md.utils.arrayReplaceAt,
+      ucm = md.utils.lib.ucmicro,
+      ZPCc = new RegExp([ ucm.Z.source, ucm.P.source, ucm.Cc.source ].join('|'));
+
+  function splitTextToken(text, level, Token) {
+    var token, last_pos = 0, nodes = [];
+
+    text.replace(compiledRE, function(match, offset, src) {
+      // Don't allow letters before :/ shortcut.
+      if (match === ':/' && offset > 0 && !ZPCc.test(src[offset - 1])) {
+        return;
+      }
+
+      var emoji_name;
+      // Validate emoji name
+      if (shortcuts.hasOwnProperty(match)) {
+        // replace shortcut with full name
+        emoji_name = shortcuts[match];
+      } else {
+        emoji_name = match.slice(1, -1);
+      }
+
+      // Add new tokens to pending list
+      if (offset > last_pos) {
+        token         = new Token('text', '', 0);
+        token.content = text.slice(last_pos, offset);
+        nodes.push(token);
+      }
+
+      token         = new Token('emoji', '', 0);
+      token.markup  = emoji_name;
+      token.content = emojies[emoji_name];
+      nodes.push(token);
+
+      last_pos = offset + match.length;
+    });
+
+    if (last_pos < text.length) {
+      token         = new Token('text', '', 0);
+      token.content = text.slice(last_pos);
+      nodes.push(token);
+    }
+
+    return nodes;
+  }
+
+  return function emoji_replace(state) {
+    var i, j, l, tokens, token,
+        blockTokens = state.tokens;
+
+    for (j = 0, l = blockTokens.length; j < l; j++) {
+      if (blockTokens[j].type !== 'inline') { continue; }
+      tokens = blockTokens[j].children;
+
+      // We scan from the end, to keep position when new tags added.
+      // Use reversed logic in links start/end match
+      for (i = tokens.length - 1; i >= 0; i--) {
+        token = tokens[i];
+
+        if (token.type === 'text' && compiledRE.test(token.content)) {
+          // replace current node
+          blockTokens[j].children = tokens = arrayReplaceAt(
+            tokens, i, splitTextToken(token.content, token.level, state.Token)
+          );
+        }
+      }
+    }
+  };
+};
+
+},{}],6:[function(require,module,exports){
+'use strict';
+
+
+var emojies_defs      = require('./lib/data/full.json');
+var emojies_shortcuts = require('./lib/data/shortcuts');
+var emoji_html        = require('./lib/render');
+var emoji_replace     = require('./lib/replace');
+var normalize_opts    = require('./lib/normalize_opts');
+
+
+module.exports = function emoji_plugin(md, options) {
+  var defaults = {
+    defs: emojies_defs,
+    shortcuts: emojies_shortcuts,
+    enabled: []
+  };
+
+  var opts = normalize_opts(md.utils.assign({}, defaults, options || {}));
+
+  md.renderer.rules.emoji = emoji_html;
+
+  md.core.ruler.push('emoji', emoji_replace(md, opts.defs, opts.shortcuts, opts.scanRE));
+};
+
+},{"./lib/data/full.json":1,"./lib/data/shortcuts":2,"./lib/normalize_opts":3,"./lib/render":4,"./lib/replace":5}]},{},[6])(6)
+});
+/*! markdown-it-footnote 2.0.0 https://github.com//markdown-it/markdown-it-footnote @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitFootnote = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Process footnotes
+//
+'use strict';
+
+////////////////////////////////////////////////////////////////////////////////
+// Renderer partials
+
+function _footnote_ref(tokens, idx) {
+  var n = Number(tokens[idx].meta.id + 1).toString();
+  var id = 'fnref' + n;
+  if (tokens[idx].meta.subId > 0) {
+    id += ':' + tokens[idx].meta.subId;
+  }
+  return '<sup class="footnote-ref"><a href="#fn' + n + '" id="' + id + '">[' + n + ']</a></sup>';
+}
+function _footnote_block_open(tokens, idx, options) {
+  return (options.xhtmlOut ? '<hr class="footnotes-sep" />\n' : '<hr class="footnotes-sep">\n') +
+         '<section class="footnotes">\n' +
+         '<ol class="footnotes-list">\n';
+}
+function _footnote_block_close() {
+  return '</ol>\n</section>\n';
+}
+function _footnote_open(tokens, idx) {
+  var id = Number(tokens[idx].meta.id + 1).toString();
+  return '<li id="fn' + id + '"  class="footnote-item">';
+}
+function _footnote_close() {
+  return '</li>\n';
+}
+function _footnote_anchor(tokens, idx) {
+  var n = Number(tokens[idx].meta.id + 1).toString();
+  var id = 'fnref' + n;
+  if (tokens[idx].meta.subId > 0) {
+    id += ':' + tokens[idx].meta.subId;
+  }
+  return ' <a href="#' + id + '" class="footnote-backref">\u21a9</a>'; /* ↩ */
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+module.exports = function sub_plugin(md) {
+  var parseLinkLabel = md.helpers.parseLinkLabel,
+      isSpace = md.utils.isSpace;
+
+  md.renderer.rules.footnote_ref          = _footnote_ref;
+  md.renderer.rules.footnote_block_open   = _footnote_block_open;
+  md.renderer.rules.footnote_block_close  = _footnote_block_close;
+  md.renderer.rules.footnote_open         = _footnote_open;
+  md.renderer.rules.footnote_close        = _footnote_close;
+  md.renderer.rules.footnote_anchor       = _footnote_anchor;
+
+  // Process footnote block definition
+  function footnote_def(state, startLine, endLine, silent) {
+    var oldBMark, oldTShift, oldSCount, oldParentType, pos, label, token,
+        initial, offset, ch, posAfterColon,
+        start = state.bMarks[startLine] + state.tShift[startLine],
+        max = state.eMarks[startLine];
+
+    // line should be at least 5 chars - "[^x]:"
+    if (start + 4 > max) { return false; }
+
+    if (state.src.charCodeAt(start) !== 0x5B/* [ */) { return false; }
+    if (state.src.charCodeAt(start + 1) !== 0x5E/* ^ */) { return false; }
+
+    for (pos = start + 2; pos < max; pos++) {
+      if (state.src.charCodeAt(pos) === 0x20) { return false; }
+      if (state.src.charCodeAt(pos) === 0x5D /* ] */) {
+        break;
+      }
+    }
+
+    if (pos === start + 2) { return false; } // no empty footnote labels
+    if (pos + 1 >= max || state.src.charCodeAt(++pos) !== 0x3A /* : */) { return false; }
+    if (silent) { return true; }
+    pos++;
+
+    if (!state.env.footnotes) { state.env.footnotes = {}; }
+    if (!state.env.footnotes.refs) { state.env.footnotes.refs = {}; }
+    label = state.src.slice(start + 2, pos - 2);
+    state.env.footnotes.refs[':' + label] = -1;
+
+    token       = new state.Token('footnote_reference_open', '', 1);
+    token.meta  = { label: label };
+    token.level = state.level++;
+    state.tokens.push(token);
+
+    oldBMark = state.bMarks[startLine];
+    oldTShift = state.tShift[startLine];
+    oldSCount = state.sCount[startLine];
+    oldParentType = state.parentType;
+
+    posAfterColon = pos;
+    initial = offset = state.sCount[startLine] + pos - (state.bMarks[startLine] + state.tShift[startLine]);
+
+    while (pos < max) {
+      ch = state.src.charCodeAt(pos);
+
+      if (isSpace(ch)) {
+        if (ch === 0x09) {
+          offset += 4 - offset % 4;
+        } else {
+          offset++;
+        }
+      } else {
+        break;
+      }
+
+      pos++;
+    }
+
+    state.tShift[startLine] = pos - posAfterColon;
+    state.sCount[startLine] = offset - initial;
+
+    state.bMarks[startLine] = posAfterColon;
+    state.blkIndent += 4;
+    state.parentType = 'footnote';
+
+    if (state.sCount[startLine] < state.blkIndent) {
+      state.sCount[startLine] += state.blkIndent;
+    }
+
+    state.md.block.tokenize(state, startLine, endLine, true);
+
+    state.parentType = oldParentType;
+    state.blkIndent -= 4;
+    state.tShift[startLine] = oldTShift;
+    state.sCount[startLine] = oldSCount;
+    state.bMarks[startLine] = oldBMark;
+
+    token       = new state.Token('footnote_reference_close', '', -1);
+    token.level = --state.level;
+    state.tokens.push(token);
+
+    return true;
+  }
+
+  // Process inline footnotes (^[...])
+  function footnote_inline(state, silent) {
+    var labelStart,
+        labelEnd,
+        footnoteId,
+        token,
+        tokens,
+        max = state.posMax,
+        start = state.pos;
+
+    if (start + 2 >= max) { return false; }
+    if (state.src.charCodeAt(start) !== 0x5E/* ^ */) { return false; }
+    if (state.src.charCodeAt(start + 1) !== 0x5B/* [ */) { return false; }
+
+    labelStart = start + 2;
+    labelEnd = parseLinkLabel(state, start + 1);
+
+    // parser failed to find ']', so it's not a valid note
+    if (labelEnd < 0) { return false; }
+
+    // We found the end of the link, and know for a fact it's a valid link;
+    // so all that's left to do is to call tokenizer.
+    //
+    if (!silent) {
+      if (!state.env.footnotes) { state.env.footnotes = {}; }
+      if (!state.env.footnotes.list) { state.env.footnotes.list = []; }
+      footnoteId = state.env.footnotes.list.length;
+
+      state.md.inline.parse(
+        state.src.slice(labelStart, labelEnd),
+        state.md,
+        state.env,
+        tokens = []
+      );
+
+      token      = state.push('footnote_ref', '', 0);
+      token.meta = { id: footnoteId };
+
+      state.env.footnotes.list[footnoteId] = { tokens: tokens };
+    }
+
+    state.pos = labelEnd + 1;
+    state.posMax = max;
+    return true;
+  }
+
+  // Process footnote references ([^...])
+  function footnote_ref(state, silent) {
+    var label,
+        pos,
+        footnoteId,
+        footnoteSubId,
+        token,
+        max = state.posMax,
+        start = state.pos;
+
+    // should be at least 4 chars - "[^x]"
+    if (start + 3 > max) { return false; }
+
+    if (!state.env.footnotes || !state.env.footnotes.refs) { return false; }
+    if (state.src.charCodeAt(start) !== 0x5B/* [ */) { return false; }
+    if (state.src.charCodeAt(start + 1) !== 0x5E/* ^ */) { return false; }
+
+    for (pos = start + 2; pos < max; pos++) {
+      if (state.src.charCodeAt(pos) === 0x20) { return false; }
+      if (state.src.charCodeAt(pos) === 0x0A) { return false; }
+      if (state.src.charCodeAt(pos) === 0x5D /* ] */) {
+        break;
+      }
+    }
+
+    if (pos === start + 2) { return false; } // no empty footnote labels
+    if (pos >= max) { return false; }
+    pos++;
+
+    label = state.src.slice(start + 2, pos - 1);
+    if (typeof state.env.footnotes.refs[':' + label] === 'undefined') { return false; }
+
+    if (!silent) {
+      if (!state.env.footnotes.list) { state.env.footnotes.list = []; }
+
+      if (state.env.footnotes.refs[':' + label] < 0) {
+        footnoteId = state.env.footnotes.list.length;
+        state.env.footnotes.list[footnoteId] = { label: label, count: 0 };
+        state.env.footnotes.refs[':' + label] = footnoteId;
+      } else {
+        footnoteId = state.env.footnotes.refs[':' + label];
+      }
+
+      footnoteSubId = state.env.footnotes.list[footnoteId].count;
+      state.env.footnotes.list[footnoteId].count++;
+
+      token      = state.push('footnote_ref', '', 0);
+      token.meta = { id: footnoteId, subId: footnoteSubId };
+    }
+
+    state.pos = pos;
+    state.posMax = max;
+    return true;
+  }
+
+  // Glue footnote tokens to end of token stream
+  function footnote_tail(state) {
+    var i, l, j, t, lastParagraph, list, token, tokens, current, currentLabel,
+        insideRef = false,
+        refTokens = {};
+
+    if (!state.env.footnotes) { return; }
+
+    state.tokens = state.tokens.filter(function(tok) {
+      if (tok.type === 'footnote_reference_open') {
+        insideRef = true;
+        current = [];
+        currentLabel = tok.meta.label;
+        return false;
+      }
+      if (tok.type === 'footnote_reference_close') {
+        insideRef = false;
+        // prepend ':' to avoid conflict with Object.prototype members
+        refTokens[':' + currentLabel] = current;
+        return false;
+      }
+      if (insideRef) { current.push(tok); }
+      return !insideRef;
+    });
+
+    if (!state.env.footnotes.list) { return; }
+    list = state.env.footnotes.list;
+
+    token = new state.Token('footnote_block_open', '', 1);
+    state.tokens.push(token);
+
+    for (i = 0, l = list.length; i < l; i++) {
+      token      = new state.Token('footnote_open', '', 1);
+      token.meta = { id: i };
+      state.tokens.push(token);
+
+      if (list[i].tokens) {
+        tokens = [];
+
+        token          = new state.Token('paragraph_open', 'p', 1);
+        token.block    = true;
+        tokens.push(token);
+
+        token          = new state.Token('inline', '', 0);
+        token.children = list[i].tokens;
+        token.content  = '';
+        tokens.push(token);
+
+        token          = new state.Token('paragraph_close', 'p', -1);
+        token.block    = true;
+        tokens.push(token);
+
+      } else if (list[i].label) {
+        tokens = refTokens[':' + list[i].label];
+      }
+
+      state.tokens = state.tokens.concat(tokens);
+      if (state.tokens[state.tokens.length - 1].type === 'paragraph_close') {
+        lastParagraph = state.tokens.pop();
+      } else {
+        lastParagraph = null;
+      }
+
+      t = list[i].count > 0 ? list[i].count : 1;
+      for (j = 0; j < t; j++) {
+        token      = new state.Token('footnote_anchor', '', 0);
+        token.meta = { id: i, subId: j };
+        state.tokens.push(token);
+      }
+
+      if (lastParagraph) {
+        state.tokens.push(lastParagraph);
+      }
+
+      token = new state.Token('footnote_close', '', -1);
+      state.tokens.push(token);
+    }
+
+    token = new state.Token('footnote_block_close', '', -1);
+    state.tokens.push(token);
+  }
+
+  md.block.ruler.before('reference', 'footnote_def', footnote_def, { alt: [ 'paragraph', 'reference' ] });
+  md.inline.ruler.after('image', 'footnote_inline', footnote_inline);
+  md.inline.ruler.after('footnote_inline', 'footnote_ref', footnote_ref);
+  md.core.ruler.after('inline', 'footnote_tail', footnote_tail);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-for-inline 0.1.1 https://github.com//markdown-it/markdown-it-for-inline @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitForInline = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+'use strict';
+
+
+module.exports = function for_inline_plugin(md, ruleName, tokenType, iteartor) {
+
+  function scan(state) {
+    var i, blkIdx, inlineTokens;
+
+    for (blkIdx = state.tokens.length - 1; blkIdx >= 0; blkIdx--) {
+      if (state.tokens[blkIdx].type !== 'inline') {
+        continue;
+      }
+
+      inlineTokens = state.tokens[blkIdx].children;
+
+      for (i = inlineTokens.length - 1; i >= 0; i--) {
+        if (inlineTokens[i].type !== tokenType) {
+          continue;
+        }
+
+        iteartor(inlineTokens, i);
+      }
+    }
+  }
+
+  md.core.ruler.push(ruleName, scan);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-ins 2.0.0 https://github.com//markdown-it/markdown-it-ins @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitIns = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+'use strict';
+
+
+module.exports = function ins_plugin(md) {
+  // Insert each marker as a separate text token, and add it to delimiter list
+  //
+  function tokenize(state, silent) {
+    var i, scanned, token, len, ch,
+        start = state.pos,
+        marker = state.src.charCodeAt(start);
+
+    if (silent) { return false; }
+
+    if (marker !== 0x2B/* + */) { return false; }
+
+    scanned = state.scanDelims(state.pos, true);
+    len = scanned.length;
+    ch = String.fromCharCode(marker);
+
+    if (len < 2) { return false; }
+
+    if (len % 2) {
+      token         = state.push('text', '', 0);
+      token.content = ch;
+      len--;
+    }
+
+    for (i = 0; i < len; i += 2) {
+      token         = state.push('text', '', 0);
+      token.content = ch + ch;
+
+      state.delimiters.push({
+        marker: marker,
+        jump:   i,
+        token:  state.tokens.length - 1,
+        level:  state.level,
+        end:    -1,
+        open:   scanned.can_open,
+        close:  scanned.can_close
+      });
+    }
+
+    state.pos += scanned.length;
+
+    return true;
+  }
+
+
+  // Walk through delimiter list and replace text tokens with tags
+  //
+  function postProcess(state) {
+    var i, j,
+        startDelim,
+        endDelim,
+        token,
+        loneMarkers = [],
+        delimiters = state.delimiters,
+        max = state.delimiters.length;
+
+    for (i = 0; i < max; i++) {
+      startDelim = delimiters[i];
+
+      if (startDelim.marker !== 0x2B/* + */) {
+        continue;
+      }
+
+      if (startDelim.end === -1) {
+        continue;
+      }
+
+      endDelim = delimiters[startDelim.end];
+
+      token         = state.tokens[startDelim.token];
+      token.type    = 'ins_open';
+      token.tag     = 'ins';
+      token.nesting = 1;
+      token.markup  = '++';
+      token.content = '';
+
+      token         = state.tokens[endDelim.token];
+      token.type    = 'ins_close';
+      token.tag     = 'ins';
+      token.nesting = -1;
+      token.markup  = '++';
+      token.content = '';
+
+      if (state.tokens[endDelim.token - 1].type === 'text' &&
+          state.tokens[endDelim.token - 1].content === '+') {
+
+        loneMarkers.push(endDelim.token - 1);
+      }
+    }
+
+    // If a marker sequence has an odd number of characters, it's splitted
+    // like this: `~~~~~` -> `~` + `~~` + `~~`, leaving one marker at the
+    // start of the sequence.
+    //
+    // So, we have to move all those markers after subsequent s_close tags.
+    //
+    while (loneMarkers.length) {
+      i = loneMarkers.pop();
+      j = i + 1;
+
+      while (j < state.tokens.length && state.tokens[j].type === 'ins_close') {
+        j++;
+      }
+
+      j--;
+
+      if (i !== j) {
+        token = state.tokens[j];
+        state.tokens[j] = state.tokens[i];
+        state.tokens[i] = token;
+      }
+    }
+  }
+
+  md.inline.ruler.before('emphasis', 'ins', tokenize);
+  md.inline.ruler2.before('emphasis', 'ins', postProcess);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-mark 2.0.0 https://github.com//markdown-it/markdown-it-mark @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitMark = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+'use strict';
+
+
+module.exports = function ins_plugin(md) {
+  // Insert each marker as a separate text token, and add it to delimiter list
+  //
+  function tokenize(state, silent) {
+    var i, scanned, token, len, ch,
+        start = state.pos,
+        marker = state.src.charCodeAt(start);
+
+    if (silent) { return false; }
+
+    if (marker !== 0x3D/* = */) { return false; }
+
+    scanned = state.scanDelims(state.pos, true);
+    len = scanned.length;
+    ch = String.fromCharCode(marker);
+
+    if (len < 2) { return false; }
+
+    if (len % 2) {
+      token         = state.push('text', '', 0);
+      token.content = ch;
+      len--;
+    }
+
+    for (i = 0; i < len; i += 2) {
+      token         = state.push('text', '', 0);
+      token.content = ch + ch;
+
+      state.delimiters.push({
+        marker: marker,
+        jump:   i,
+        token:  state.tokens.length - 1,
+        level:  state.level,
+        end:    -1,
+        open:   scanned.can_open,
+        close:  scanned.can_close
+      });
+    }
+
+    state.pos += scanned.length;
+
+    return true;
+  }
+
+
+  // Walk through delimiter list and replace text tokens with tags
+  //
+  function postProcess(state) {
+    var i, j,
+        startDelim,
+        endDelim,
+        token,
+        loneMarkers = [],
+        delimiters = state.delimiters,
+        max = state.delimiters.length;
+
+    for (i = 0; i < max; i++) {
+      startDelim = delimiters[i];
+
+      if (startDelim.marker !== 0x3D/* = */) {
+        continue;
+      }
+
+      if (startDelim.end === -1) {
+        continue;
+      }
+
+      endDelim = delimiters[startDelim.end];
+
+      token         = state.tokens[startDelim.token];
+      token.type    = 'mark_open';
+      token.tag     = 'mark';
+      token.nesting = 1;
+      token.markup  = '==';
+      token.content = '';
+
+      token         = state.tokens[endDelim.token];
+      token.type    = 'mark_close';
+      token.tag     = 'mark';
+      token.nesting = -1;
+      token.markup  = '==';
+      token.content = '';
+
+      if (state.tokens[endDelim.token - 1].type === 'text' &&
+          state.tokens[endDelim.token - 1].content === '=') {
+
+        loneMarkers.push(endDelim.token - 1);
+      }
+    }
+
+    // If a marker sequence has an odd number of characters, it's splitted
+    // like this: `~~~~~` -> `~` + `~~` + `~~`, leaving one marker at the
+    // start of the sequence.
+    //
+    // So, we have to move all those markers after subsequent s_close tags.
+    //
+    while (loneMarkers.length) {
+      i = loneMarkers.pop();
+      j = i + 1;
+
+      while (j < state.tokens.length && state.tokens[j].type === 'mark_close') {
+        j++;
+      }
+
+      j--;
+
+      if (i !== j) {
+        token = state.tokens[j];
+        state.tokens[j] = state.tokens[i];
+        state.tokens[i] = token;
+      }
+    }
+  }
+
+  md.inline.ruler.before('emphasis', 'mark', tokenize);
+  md.inline.ruler2.before('emphasis', 'mark', postProcess);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-sub 1.0.0 https://github.com//markdown-it/markdown-it-sub @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitSub = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Process ~subscript~
+
+'use strict';
+
+// same as UNESCAPE_MD_RE plus a space
+var UNESCAPE_RE = /\\([ \\!"#$%&'()*+,.\/:;<=>?@[\]^_`{|}~-])/g;
+
+
+function subscript(state, silent) {
+  var found,
+      content,
+      token,
+      max = state.posMax,
+      start = state.pos;
+
+  if (state.src.charCodeAt(start) !== 0x7E/* ~ */) { return false; }
+  if (silent) { return false; } // don't run any pairs in validation mode
+  if (start + 2 >= max) { return false; }
+
+  state.pos = start + 1;
+
+  while (state.pos < max) {
+    if (state.src.charCodeAt(state.pos) === 0x7E/* ~ */) {
+      found = true;
+      break;
+    }
+
+    state.md.inline.skipToken(state);
+  }
+
+  if (!found || start + 1 === state.pos) {
+    state.pos = start;
+    return false;
+  }
+
+  content = state.src.slice(start + 1, state.pos);
+
+  // don't allow unescaped spaces/newlines inside
+  if (content.match(/(^|[^\\])(\\\\)*\s/)) {
+    state.pos = start;
+    return false;
+  }
+
+  // found!
+  state.posMax = state.pos;
+  state.pos = start + 1;
+
+  // Earlier we checked !silent, but this implementation does not need it
+  token         = state.push('sub_open', 'sub', 1);
+  token.markup  = '~';
+
+  token         = state.push('text', '', 0);
+  token.content = content.replace(UNESCAPE_RE, '$1');
+
+  token         = state.push('sub_close', 'sub', -1);
+  token.markup  = '~';
+
+  state.pos = state.posMax + 1;
+  state.posMax = max;
+  return true;
+}
+
+
+module.exports = function sub_plugin(md) {
+  md.inline.ruler.after('emphasis', 'sub', subscript);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-sup 1.0.0 https://github.com//markdown-it/markdown-it-sup @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitSup = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// Process ^superscript^
+
+'use strict';
+
+// same as UNESCAPE_MD_RE plus a space
+var UNESCAPE_RE = /\\([ \\!"#$%&'()*+,.\/:;<=>?@[\]^_`{|}~-])/g;
+
+function superscript(state, silent) {
+  var found,
+      content,
+      token,
+      max = state.posMax,
+      start = state.pos;
+
+  if (state.src.charCodeAt(start) !== 0x5E/* ^ */) { return false; }
+  if (silent) { return false; } // don't run any pairs in validation mode
+  if (start + 2 >= max) { return false; }
+
+  state.pos = start + 1;
+
+  while (state.pos < max) {
+    if (state.src.charCodeAt(state.pos) === 0x5E/* ^ */) {
+      found = true;
+      break;
+    }
+
+    state.md.inline.skipToken(state);
+  }
+
+  if (!found || start + 1 === state.pos) {
+    state.pos = start;
+    return false;
+  }
+
+  content = state.src.slice(start + 1, state.pos);
+
+  // don't allow unescaped spaces/newlines inside
+  if (content.match(/(^|[^\\])(\\\\)*\s/)) {
+    state.pos = start;
+    return false;
+  }
+
+  // found!
+  state.posMax = state.pos;
+  state.pos = start + 1;
+
+  // Earlier we checked !silent, but this implementation does not need it
+  token         = state.push('sup_open', 'sup', 1);
+  token.markup  = '^';
+
+  token         = state.push('text', '', 0);
+  token.content = content.replace(UNESCAPE_RE, '$1');
+
+  token         = state.push('sup_close', 'sup', -1);
+  token.markup  = '^';
+
+  state.pos = state.posMax + 1;
+  state.posMax = max;
+  return true;
+}
+
+
+module.exports = function sup_plugin(md) {
+  md.inline.ruler.after('emphasis', 'sup', superscript);
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdown-it-toc 1.0.0 https://github.com/samchrisinger/markdown-it-toc @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitToc = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}
+)({1:[function(require,module,exports){
+// Process @[toc](|Title)
+
+'use strict';
+
+module.exports = function(md) {
+
+    var TOC_REGEXP = /^\[toc\]$/im;
+    var gstate;
+    var matchedToc = false;
+
+    function toc(state, silent) {
+        matchedToc = false;
+
+        while (state.src.indexOf('\n') >= 0 && state.src.indexOf('\n') < state.src.indexOf('[toc]')) {
+            if (state.tokens.slice(-1)[0].type === 'softbreak') {
+                state.src = state.src.split('\n').slice(1).join('\n');
+                state.pos = 0;
+            }
+        }
+        var token;
+
+        // trivial rejections
+        if (state.src.charCodeAt(state.pos) !== 0x5B /* [ */ ) {
+            return false;
+        }
+
+        var match = TOC_REGEXP.exec(state.src);
+        if (!match) {
+            return false;
+        }
+        match = match.filter(function(m) {
+            return m;
+        });
+        if (match.length < 1) {
+            return false;
+        }
+        if (silent) { // don't run any pairs in validation mode
+            return false;
+        }
+
+        token = state.push('toc_open', 'toc', 1);
+        token.markup = '[toc]';
+
+        token = state.push('toc_body', '', 0);
+        token.content = '';
+
+        token = state.push('toc_close', 'toc', -1);
+
+        var offset = 0;
+        var newline = state.src.indexOf('\n');
+        if (newline !== -1) {
+            offset = state.pos + newline;
+        } else {
+            offset = state.pos + state.posMax + 1;
+        }
+        state.pos = offset;
+
+        matchedToc = true;
+        return true;
+    }
+
+    md.renderer.rules.heading_open = function(tokens, index, options, env, self) {
+        var level = tokens[index].tag;
+        var label = tokens[index + 1];
+        var resultHtml = self.renderToken(tokens, index, options, env);
+        if (matchedToc && label.type === 'inline') {
+            var anchor = label.map[0];
+            resultHtml += '<a id="mdToc' + anchor + '"></a>';
+        }
+        return resultHtml;
+    };
+
+    md.renderer.rules.toc_open = function(tokens, index) {
+        return '';
+    };
+
+    md.renderer.rules.toc_close = function(tokens, index) {
+        return '';
+    };
+
+    md.renderer.rules.toc_body = function(tokens, index) {
+        // Wanted to avoid linear search through tokens here, 
+        // but this seems the only reliable way to identify headings
+        var headings = [];
+        var gtokens = gstate.tokens;
+        var size = gtokens.length;
+        var minLevel = 999999;
+        for (var i = 0; i < size; i++) {
+            if (gtokens[i].type !== 'heading_close') {
+                continue;
+            }
+            var token = gtokens[i];
+            var heading = gtokens[i - 1];
+            var level = +token.tag.substr(1, 1);
+            minLevel = level < minLevel ? level : minLevel;
+            if (heading.type === 'inline') {
+                headings.push({
+                    level: level,
+                    anchor: heading.map[0],
+                    content: heading.content
+                });
+            }
+        }
+
+        var indent = minLevel - 1;
+        var list = headings.map(function(heading) {
+            var res = [];
+            if (heading.level > indent) {
+                var ldiff = (heading.level - indent);
+                for (var i = 0; i < ldiff; i++) {
+                    res.push('<ul class="table-of-contents">');
+                    indent++;
+                }
+            } else if (heading.level < indent) {
+                var ldiff = (indent - heading.level);
+                for (var i = 0; i < ldiff; i++) {
+                    res.push('</ul>');
+                    indent--;
+                }
+            }
+            res = res.concat(['<li><a href="#mdToc', heading.anchor, '">', heading.content, '</a></li>']);
+            return res.join('');
+        });
+
+        return list.join('') + new Array(indent + 1).join('</ul>');
+    };
+
+    md.core.ruler.push('grab_state', function(state) {
+        gstate = state;
+    });
+    md.inline.ruler.after('emphasis', 'toc', toc);
+};
+
+},{}]},{},[1])(1)
+});
+
+
+
+/*! markdown-it-simplemath 1.0.0 https://github.com//adam-p/markdown-it-simplemath @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownitSimpleMath = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*
+ * Copyright Adam Pritchard 2015
+ * MIT License : http://adampritchard.mit-license.org/
+ */
+
+/*
+This is basically a stripped down, simplified version of:
+https://github.com/runarberg/markdown-it-math
+The extra math libraries included by that project were too onerous for use in
+Markdown Here, so this has been altered specifically for the needs of MDH.
+*/
+
+'use strict';
+/*jshint node:true*/
+
+
+function scanDelims(state, start) {
+  var pos = state.pos, lastChar, nextChar, count,
+      isLastWhiteSpace, isLastPunctChar,
+      isNextWhiteSpace, isNextPunctChar,
+      can_open = true,
+      can_close = true,
+      max = state.posMax,
+      isWhiteSpace = state.md.utils.isWhiteSpace,
+      isPunctChar = state.md.utils.isPunctChar,
+      isMdAsciiPunct = state.md.utils.isMdAsciiPunct;
+  // treat beginning of the line as a whitespace
+  lastChar = start > 0 ? state.src.charCodeAt(start - 1) : 0x20;
+  if (pos >= max) {
+    can_open = false;
+  }
+  count = pos - start;
+  // treat end of the line as a whitespace
+  nextChar = pos < max ? state.src.charCodeAt(pos) : 0x20;
+  isLastPunctChar = isMdAsciiPunct(lastChar) || isPunctChar(String.fromCharCode(lastChar));
+  isNextPunctChar = isMdAsciiPunct(nextChar) || isPunctChar(String.fromCharCode(nextChar));
+  isLastWhiteSpace = isWhiteSpace(lastChar);
+  isNextWhiteSpace = isWhiteSpace(nextChar);
+  if (isNextWhiteSpace) {
+    can_open = false;
+  } else if (isNextPunctChar) {
+    if (!(isLastWhiteSpace || isLastPunctChar)) {
+      can_open = false;
+    }
+  }
+  if (isLastWhiteSpace) {
+    can_close = false;
+  } else if (isLastPunctChar) {
+    if (!(isNextWhiteSpace || isNextPunctChar)) {
+      can_close = false;
+    }
+  }
+  return {
+    can_open: can_open,
+    can_close: can_close,
+    delims: count
+  };
+}
+
+
+function makeMath_inline(open, close) {
+  return function math_inline(state, silent) {
+    var startCount,
+        found,
+        res,
+        token,
+        closeDelim,
+        max = state.posMax,
+        start = state.pos,
+        openDelim = state.src.slice(start, start + open.length);
+
+    if (openDelim !== open) { return false; }
+    if (silent) { return false; }    // Don’t run any pairs in validation mode
+
+    res = scanDelims(state, start + open.length);
+    startCount = res.delims;
+
+    if (!res.can_open) {
+      state.pos += startCount;
+      // Earlier we checked !silent, but this implementation does not need it
+      state.pending += state.src.slice(start, state.pos);
+      return true;
+    }
+
+    state.pos = start + open.length;
+
+    while (state.pos < max) {
+      closeDelim = state.src.slice(state.pos, state.pos + close.length);
+      if (closeDelim === close) {
+        res = scanDelims(state, state.pos + close.length);
+        if (res.can_close) {
+          found = true;
+          break;
+        }
+      }
+
+      state.md.inline.skipToken(state);
+    }
+
+    if (!found) {
+      // Parser failed to find ending tag, so it is not a valid math
+      state.pos = start;
+      return false;
+    }
+
+    if (start + close.length === state.pos) {
+      // There is nothing between the delimiters -- don't match.
+      state.pos = start;
+      return false;
+    }
+
+    // Found!
+    state.posMax = state.pos;
+    state.pos = start + close.length;
+
+    // Earlier we checked !silent, but this implementation does not need it
+    token = state.push('math_inline', 'math', 0);
+    token.content = state.src.slice(state.pos, state.posMax);
+    token.markup = open;
+
+    state.pos = state.posMax + close.length;
+    state.posMax = max;
+
+    return true;
+  };
+}
+
+module.exports = function math_plugin(md, options) {
+  var inlineOpen = '$$',
+      inlineClose = '$$';
+  if (!options || !options.inlineRenderer) {
+    throw new Error('options.inlineRender is required');
+  }
+  var inlineRenderer = function(tokens, idx) {
+    return options.inlineRenderer(tokens[idx].content, (tokens.length == 1));
+  };
+
+  var math_inline = makeMath_inline(inlineOpen, inlineClose);
+
+  md.inline.ruler.before('escape', 'math_inline', math_inline);
+  md.renderer.rules.math_inline = inlineRenderer;
+};
+
+},{}]},{},[1])(1)
+});
+/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.MarkdownYt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}
+)({1:[function(require,module,exports){
+
+'use strict';
+
+var defaults = {
+    html:           true,        // Enable HTML tags in source
+    xhtmlOut:       true,        // Use '/' to close single tags (<br />)
+    breaks:         true,        // Convert '\n' in paragraphs into <br>
+    linkify:        true,         // autoconvert URL-like texts to links
+    typographer:    false,         // Enable smartypants and other sweet transforms
+
+
+    useAbbr:        true,
+    useContainer:   true,
+    useDeflist:     true,
+    useEmoji:       true,
+    useFootnote:    true,
+    useIns:         true,
+    useMark:        true,
+    useSub:         true,
+    useSup:         true,
+    useToc:         true,
+    useMath:        false,
+
+    useLinkNewWin:  false,
+    useSourceLine:  false,
+    useCodeBlockPre:false,
+    
+    highlight:      false,
+    useLineNumber:  true,
+    useShowLangName:true,
+
+};
+
+var langNamesForDisplay = {
+    '1c': '1C',
+    'accesslog': 'Access logs',
+    'armasm': 'ARM assembler',
+    'arm': 'ARM assembler',
+    'avrasm': 'AVR assembler',
+    'actionscript': 'ActionScript',
+    'as': 'ActionScript',
+    'apache': 'Apache',
+    'apacheconf': 'Apache',
+    'applescript': 'AppleScript',
+    'osascript': 'AppleScript',
+    'asciidoc': 'AsciiDoc',
+    'adoc': 'AsciiDoc',
+    'aspectj': 'AspectJ',
+    'autohotkey': 'AutoHotkey',
+    'autoit': 'AutoIt',
+    'axapta': 'Axapta',
+    'bash': 'Bash',
+    'sh': 'Bash',
+    'zsh': 'Bash',
+    'basic': 'Basic',
+    'brainfuck': 'Brainfuck',
+    'bf': 'Brainfuck',
+    'cs': 'C#',
+    'csharp': 'C#',
+    'c': 'C',
+    'cc': 'C',
+    'h': 'C',
+    'cpp': 'C++',
+    'c++': 'C++',
+    'h++': 'C++',
+    'hpp': 'C++',
+    'cal': 'C/AL',
+    'cos': 'Cache Object Script',
+    'cls': 'Cache Object Script',
+    'cmake': 'CMake',
+    'cmake.in': 'CMake',
+    'csp': 'CSP',
+    'css': 'CSS',
+    'capnproto': 'Cap\'n Proto',
+    'capnp': 'Cap\'n Proto',
+    'clojure': 'Clojure',
+    'clj': 'Clojure',
+    'coffeescript': 'CoffeeScript',
+    'coffee': 'CoffeeScript',
+    'cson': 'CoffeeScript',
+    'iced': 'CoffeeScript',
+    'crmsh': 'Crmsh',
+    'crm': 'Crmsh',
+    'pcmk': 'Crmsh',
+    'crystal': 'Crystal',
+    'cr': 'Crystal',
+    'd': 'D',
+    'dns': 'DNS Zone file',
+    'zone': 'DNS Zone file',
+    'bind': 'DNS Zone file',
+    'dos': 'DOS',
+    'bat': 'DOS',
+    'cmd': 'DOS',
+    'dart': 'Dart',
+    'delphi': 'Delphi',
+    'dpr': 'Delphi',
+    'dfm': 'Delphi',
+    'pas': 'Delphi',
+    'pascal': 'Delphi',
+    'freepascal': 'Delphi',
+    'lazarus': 'Delphi',
+    'lpr': 'Delphi',
+    'lfm': 'Delphi',
+    'diff': 'Diff',
+    'patch': 'Diff',
+    'django': 'Django',
+    'jinja': 'Django',
+    'dockerfile': 'Dockerfile',
+    'docker': 'Dockerfile',
+    'dts': 'DTS (Device Tree)',
+    'dust': 'Dust',
+    'dst': 'Dust',
+    'elixir': 'Elixir',
+    'elm': 'Elm',
+    'erlang': 'Erlang',
+    'erl': 'Erlang',
+    'fsharp': 'F#',
+    'fs': 'F#',
+    'fix': 'FIX',
+    'fortran': 'Fortran',
+    'f90': 'Fortran',
+    'f95': 'Fortran',
+    'gcode': 'G-Code',
+    'nc': 'G-Code',
+    'gams': 'Gams',
+    'gms': 'Gams',
+    'gauss': 'GAUSS',
+    'gss': 'GAUSS',
+    'gherkin': 'Gherkin',
+    'go': 'Go',
+    'golang': 'Go',
+    'golo': 'Golo',
+    'gololang': 'Golo',
+    'gradle': 'Gradle',
+    'groovy': 'Groovy',
+    'html': 'HTML',
+    'xhtml': 'HTML',
+    'xml': 'XML',
+    'rss': 'XML',
+    'atom': 'XML',
+    'xsl': 'XML',
+    'plist': 'XML',
+    'http': 'HTTP',
+    'https': 'HTTP',
+    'haml': 'Haml',
+    'handlebars': 'Handlebars',
+    'hbs': 'Handlebars',
+    'html.hbs': 'Handlebars',
+    'html.handlebars': 'Handlebars',
+    'haskell': 'Haskell',
+    'hs': 'Haskell',
+    'haxe': 'Haxe',
+    'hx': 'Haxe',
+    'ini': 'Ini',
+    'inform7': 'Inform7',
+    'i7': 'Inform7',
+    'irpf90': 'IRPF90',
+    'json': 'JSON',
+    'java': 'Java',
+    'jsp': 'Java',
+    'javascript': 'JavaScript',
+    'js': 'JavaScript',
+    'jsx': 'JavaScript',
+    'lasso': 'Lasso',
+    'lassoscript': 'Lasso',
+    'less': 'Less',
+    'lisp': 'Lisp',
+    'livecodeserver': 'LiveCode Server',
+    'livescript': 'LiveScript',
+    'ls': 'LiveScript',
+    'lua': 'Lua',
+    'makefile': 'Makefile',
+    'mk': 'Makefile',
+    'mak': 'Makefile',
+    'markdown': 'Markdown',
+    'md': 'Markdown',
+    'mkdown': 'Markdown',
+    'mkd': 'Markdown',
+    'mathematica': 'Mathematica',
+    'mma': 'Mathematica',
+    'matlab': 'Matlab',
+    'maxima': 'Maxima',
+    'mel': 'Maya Embedded Language',
+    'mercury': 'Mercury',
+    'mizar': 'Mizar',
+    'mojolicious': 'Mojolicious',
+    'monkey': 'Monkey',
+    'nsis': 'NSIS',
+    'nginx': 'Nginx',
+    'nginxconf': 'Nginx',
+    'nimrod': 'Nimrod',
+    'nim': 'Nimrod',
+    'nix': 'Nix',
+    'ocaml': 'OCaml',
+    'ml': 'OCaml',
+    'objectivec': 'Objective C',
+    'mm': 'Objective C',
+    'objc': 'Objective C',
+    'obj-c': 'Objective C',
+    'glsl': 'OpenGL Shading Language',
+    'openscad': 'OpenSCAD',
+    'scad': 'OpenSCAD',
+    'ruleslanguage': 'Oracle Rules Language',
+    'oxygene': 'Oxygene',
+    'pf': 'PF',
+    'pf.conf': 'PF',
+    'php': 'PHP',
+    'php3': 'PHP',
+    'php4': 'PHP',
+    'php5': 'PHP',
+    'php6': 'PHP',
+    'parser3': 'Parser3',
+    'perl': 'Perl',
+    'pl': 'Perl',
+    'powershell': 'PowerShell',
+    'ps': 'PowerShell',
+    'processing': 'Processing',
+    'prolog': 'Prolog',
+    'protobuf': 'Protocol Buffers',
+    'puppet': 'Puppet',
+    'pp': 'Puppet',
+    'python': 'Python',
+    'py': 'Python',
+    'gyp': 'Python',
+    'profile': 'Python profiler results',
+    'k': 'Q',
+    'kdb': 'Q',
+    'qml': 'QML',
+    'r': 'R',
+    'rib': 'RenderMan RIB',
+    'rsl': 'RenderMan RSL',
+    'graph': 'Roboconf',
+    'instances': 'Roboconf',
+    'ruby': 'Ruby',
+    'rb': 'Ruby',
+    'gemspec': 'Ruby',
+    'podspec': 'Ruby',
+    'thor': 'Ruby',
+    'irb': 'Ruby',
+    'rust': 'Rust',
+    'rs': 'Rust',
+    'scss': 'SCSS',
+    'sql': 'SQL',
+    'p21': 'STEP Part 21',
+    'step': 'STEP Part 21',
+    'stp': 'STEP Part 21',
+    'scala': 'Scala',
+    'scheme': 'Scheme',
+    'scilab': 'Scilab',
+    'sci': 'Scilab',
+    'smali': 'Smali',
+    'smalltalk': 'Smalltalk',
+    'st': 'Smalltalk',
+    'stan': 'Stan',
+    'stata': 'Stata',
+    'stylus': 'Stylus',
+    'styl': 'Stylus',
+    'swift': 'Swift',
+    'tcl': 'Tcl',
+    'tk': 'Tcl',
+    'tex': 'TeX',
+    'thrift': 'Thrift',
+    'tp': 'TP',
+    'twig': 'Twig',
+    'craftcms': 'Twig',
+    'typescript': 'TypeScript',
+    'ts': 'TypeScript',
+    'vbnet': 'VB.Net',
+    'vb': 'VB.Net',
+    'vbscript': 'VBScript',
+    'vbs': 'VBScript',
+    'vhdl': 'VHDL',
+    'vala': 'Vala',
+    'verilog': 'Verilog',
+    'v': 'Verilog',
+    'vim': 'Vim Script',
+    'x86asm': 'x86 Assembly',
+    'xl': 'XL',
+    'tao': 'XL',
+    'xpath': 'XQuery',
+    'xq': 'XQuery',
+    'zephir': 'Zephir',
+    'zep': 'Zephir',
+}
+
+
+
+module.exports = function(settingOptions) {
+    var markdownYt = markdownit();
+    var options = markdownYt.utils.assign({}, defaults, settingOptions);
+    markdownYt = markdownYt.set(options);
+    
+    function makeErrorMark(title, content) {
+        return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
+    }
+
+    function formatMathContent(mathContent, displayMode, sourceLineString, options) {
+        var result = '';
+        if (typeof katex === "undefined") {
+            result = makeErrorMark("No Katex", mathContent);
+        }
+        try {
+            result = katex.renderToString(mathContent, { displayMode: displayMode });
+        }
+        catch (err) {
+            result = makeErrorMark("Math Convert Error", mathContent);
+        }
+        return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
+    }
+
+    function highLightJs(code, langInfo, isInline, sourceLineString, options) {
+        var highlighted = '';
+        var langClass = '';
+        var langDisplay = langNamesForDisplay[langInfo.toLowerCase()];
+        var langNameDisplay = '';
+
+        if (langInfo && hljs.getLanguage(langInfo)) {
+            langClass = ' ' + options.langPrefix + langInfo;
+            try {
+                highlighted = hljs.highlight(langInfo, code, true).value;
+            } catch (__) { 
+                highlighted = markdownYt.utils.escapeHtml(code);
+            }
+        } else {
+            highlighted = markdownYt.utils.escapeHtml(code);
+        }
+
+        if (isInline) {
+            if (langDisplay && options.useShowLangName) {
+                langNameDisplay = ' title="' + langDisplay + '"';
+            }
+            return '<code class="hljs inline' + langClass + '"' + langNameDisplay + '>'
+                + highlighted
+                + '</code>';
+        }
+        else {
+            if (langDisplay && options.useShowLangName) {
+                langNameDisplay = '<div class="show-language"><div class="show-language-label">' + langDisplay + '</div></div>';
+            }
+            var lineNumbersWrapper = '';
+            var lineNumbersClass = '';
+            if (options.useLineNumber) {
+                var match = code.match(/\n(?!$)/g);
+                var linesNum = match ? match.length + 1 : 1;
+                var lines = new Array(linesNum + 1);
+                lineNumbersWrapper = '<span class="line-numbers-rows">' + lines.join('<span></span>') + '</span>';
+                lineNumbersClass = ' line-numbers';
+            }
+
+            return langNameDisplay + '<pre' + sourceLineString + ' class="hljs' + lineNumbersClass + '"><code class="' + langClass + '">'
+                + highlighted + lineNumbersWrapper + '</code></pre>\n';
+        }
+    }
+
+    if (options.useAbbr) {
+        markdownYt = markdownYt.use(markdownitAbbr);
+    }
+    if (options.useContainer) {
+        markdownYt = markdownYt.use(markdownitContainer, 'success');
+        markdownYt = markdownYt.use(markdownitContainer, 'info');
+        markdownYt = markdownYt.use(markdownitContainer, 'warning');
+        markdownYt = markdownYt.use(markdownitContainer, 'danger');
+    }
+    if (options.useDeflist) {
+        markdownYt = markdownYt.use(markdownitDeflist);
+    }
+    if (options.useEmoji) {
+        markdownYt = markdownYt.use(markdownitEmoji);
+    }
+    if (options.useFootnote) {
+        markdownYt = markdownYt.use(markdownitFootnote);
+    }
+    if (options.useIns) {
+        markdownYt = markdownYt.use(markdownitIns);
+    }
+    if (options.useMark) {
+        markdownYt = markdownYt.use(markdownitMark);
+    }
+    if (options.useSub) {
+        markdownYt = markdownYt.use(markdownitSub);
+    }
+    if (options.useSup) {
+        markdownYt = markdownYt.use(markdownitSup);
+    }
+    if (options.useToc) {
+        markdownYt = markdownYt.use(markdownitToc);
+    }
+    if (options.useMath) {
+        markdownYt = markdownYt.use(markdownitSimpleMath, {inlineRenderer: function(math, displayMode) {
+            return formatMathContent(math, displayMode, '');
+        }});
+    }
+    if (options.useLinkNewWin) {
+        markdownYt = markdownYt.use(markdownitForInline, "url_new_win", "link_open", function (tokens, idx) {
+            tokens[idx].attrPush([ "target", "_blank" ]);
+        });
+    }
+
+    markdownYt.renderer.render = function(tokens, options, env) {
+        var i, len, type,
+            result = '',
+            rules = this.rules;
+
+        for (i = 0, len = tokens.length; i < len; i++) {
+
+            if (options.useSourceLine && tokens[i].type.match(/_open$/i) && tokens[i].level === 0 && tokens[i].map != null) {
+                tokens[i].attrPush(['data-source-line', tokens[i].map[0] + 1]);
+            }
+
+            type = tokens[i].type;
+
+            if (type === 'inline') {
+                result += this.renderInline(tokens[i].children, options, env);
+            } else if (typeof rules[type] !== 'undefined') {
+                result += rules[tokens[i].type](tokens, i, options, env, this);
+            } else {
+                result += this.renderToken(tokens, i, options, env);
+            }
+        }
+
+        return result;
+    };
+
+    markdownYt.renderer.rules.code_inline = function(tokens, idx, options) {
+        var content = tokens[idx].content;
+        var langName = '';
+
+        var matchCode = /^(\w+)#/.exec(content);
+        if (matchCode) {
+            langName = matchCode[1];
+            content = content.substring(matchCode[0].length);
+        }
+
+        if (options.highlight !== true && options.highlight) {
+            return options.highlight(content, langName, true, '', markdownYt.options);
+        }
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(content, langName, true, '', markdownYt.options);
+        }
+        else if (langName.length > 0) {
+            return '<code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(content)
+                + '</code>';
+        }
+        else {
+            return '<code>' + markdownYt.utils.escapeHtml(content) + '</code>';
+        }
+    };
+
+    markdownYt.renderer.rules.fence = function (tokens, idx, options) {
+        var token = tokens[idx];
+        var code = token.content.trim();
+        var langName = token.info.trim();
+        var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
+
+        if(options.useMath && /math/i.test(langName)) {
+            return formatMathContent(code, true, sourceLineString);
+        }
+
+        if (options.highlight !== true && options.highlight) {
+            return options.highlight(code, langName, false, sourceLineString, markdownYt.options);
+        }
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(code, langName, false, sourceLineString, markdownYt.options);
+        }
+        else if (langName) {
+            return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+        else {
+            return  '<pre' + sourceLineString + '><code>'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+    };
+
+    markdownYt.renderer.rules.code_block = function (tokens, idx, options) {
+        var token = tokens[idx];
+        var code = token.content.trim();
+        var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
+
+        if (options.useCodeBlockPre) {
+            return  '<pre' + sourceLineString + '>' + markdownYt.utils.escapeHtml(code) + '</pre>\n';
+        }
+        else if (options.highlight !== true && options.highlight) {
+            return options.highlight(code, '', false, sourceLineString, markdownYt.options);
+        }
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return '<pre' + sourceLineString + ' class="hljs"><code>' 
+                + markdownYt.utils.escapeHtml(code) 
+                + '</code></pre>\n';
+        }
+        else {
+            return  '<pre' + sourceLineString + '><code>'
+                + markdownYt.utils.escapeHtml(code)
+                + '</code></pre>\n';
+        }
+    };
+
+    return markdownYt;
+};
+
+},{}]},{},[1])(1)
+});

@@ -1,4 +1,5 @@
-/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.markdownyt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/*! markdownyt https://github.com/yutuo/markdown.yt @license MIT */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.MarkdownYt = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s}
+)({1:[function(require,module,exports){
 
 'use strict';
 
@@ -21,59 +22,337 @@ var defaults = {
     useSup:         true,
     useToc:         true,
     useMath:        false,
+
     useLinkNewWin:  false,
     useSourceLine:  false,
     useCodeBlockPre:false,
+    
+    highlight:      false,
+    useLineNumber:  true,
+    useShowLangName:true,
 
 };
 
-
-function makeErrorMark(title, content) {
-    return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
+var langNamesForDisplay = {
+    '1c': '1C',
+    'accesslog': 'Access logs',
+    'armasm': 'ARM assembler',
+    'arm': 'ARM assembler',
+    'avrasm': 'AVR assembler',
+    'actionscript': 'ActionScript',
+    'as': 'ActionScript',
+    'apache': 'Apache',
+    'apacheconf': 'Apache',
+    'applescript': 'AppleScript',
+    'osascript': 'AppleScript',
+    'asciidoc': 'AsciiDoc',
+    'adoc': 'AsciiDoc',
+    'aspectj': 'AspectJ',
+    'autohotkey': 'AutoHotkey',
+    'autoit': 'AutoIt',
+    'axapta': 'Axapta',
+    'bash': 'Bash',
+    'sh': 'Bash',
+    'zsh': 'Bash',
+    'basic': 'Basic',
+    'brainfuck': 'Brainfuck',
+    'bf': 'Brainfuck',
+    'cs': 'C#',
+    'csharp': 'C#',
+    'c': 'C',
+    'cc': 'C',
+    'h': 'C',
+    'cpp': 'C++',
+    'c++': 'C++',
+    'h++': 'C++',
+    'hpp': 'C++',
+    'cal': 'C/AL',
+    'cos': 'Cache Object Script',
+    'cls': 'Cache Object Script',
+    'cmake': 'CMake',
+    'cmake.in': 'CMake',
+    'csp': 'CSP',
+    'css': 'CSS',
+    'capnproto': 'Cap\'n Proto',
+    'capnp': 'Cap\'n Proto',
+    'clojure': 'Clojure',
+    'clj': 'Clojure',
+    'coffeescript': 'CoffeeScript',
+    'coffee': 'CoffeeScript',
+    'cson': 'CoffeeScript',
+    'iced': 'CoffeeScript',
+    'crmsh': 'Crmsh',
+    'crm': 'Crmsh',
+    'pcmk': 'Crmsh',
+    'crystal': 'Crystal',
+    'cr': 'Crystal',
+    'd': 'D',
+    'dns': 'DNS Zone file',
+    'zone': 'DNS Zone file',
+    'bind': 'DNS Zone file',
+    'dos': 'DOS',
+    'bat': 'DOS',
+    'cmd': 'DOS',
+    'dart': 'Dart',
+    'delphi': 'Delphi',
+    'dpr': 'Delphi',
+    'dfm': 'Delphi',
+    'pas': 'Delphi',
+    'pascal': 'Delphi',
+    'freepascal': 'Delphi',
+    'lazarus': 'Delphi',
+    'lpr': 'Delphi',
+    'lfm': 'Delphi',
+    'diff': 'Diff',
+    'patch': 'Diff',
+    'django': 'Django',
+    'jinja': 'Django',
+    'dockerfile': 'Dockerfile',
+    'docker': 'Dockerfile',
+    'dts': 'DTS (Device Tree)',
+    'dust': 'Dust',
+    'dst': 'Dust',
+    'elixir': 'Elixir',
+    'elm': 'Elm',
+    'erlang': 'Erlang',
+    'erl': 'Erlang',
+    'fsharp': 'F#',
+    'fs': 'F#',
+    'fix': 'FIX',
+    'fortran': 'Fortran',
+    'f90': 'Fortran',
+    'f95': 'Fortran',
+    'gcode': 'G-Code',
+    'nc': 'G-Code',
+    'gams': 'Gams',
+    'gms': 'Gams',
+    'gauss': 'GAUSS',
+    'gss': 'GAUSS',
+    'gherkin': 'Gherkin',
+    'go': 'Go',
+    'golang': 'Go',
+    'golo': 'Golo',
+    'gololang': 'Golo',
+    'gradle': 'Gradle',
+    'groovy': 'Groovy',
+    'html': 'HTML',
+    'xhtml': 'HTML',
+    'xml': 'XML',
+    'rss': 'XML',
+    'atom': 'XML',
+    'xsl': 'XML',
+    'plist': 'XML',
+    'http': 'HTTP',
+    'https': 'HTTP',
+    'haml': 'Haml',
+    'handlebars': 'Handlebars',
+    'hbs': 'Handlebars',
+    'html.hbs': 'Handlebars',
+    'html.handlebars': 'Handlebars',
+    'haskell': 'Haskell',
+    'hs': 'Haskell',
+    'haxe': 'Haxe',
+    'hx': 'Haxe',
+    'ini': 'Ini',
+    'inform7': 'Inform7',
+    'i7': 'Inform7',
+    'irpf90': 'IRPF90',
+    'json': 'JSON',
+    'java': 'Java',
+    'jsp': 'Java',
+    'javascript': 'JavaScript',
+    'js': 'JavaScript',
+    'jsx': 'JavaScript',
+    'lasso': 'Lasso',
+    'lassoscript': 'Lasso',
+    'less': 'Less',
+    'lisp': 'Lisp',
+    'livecodeserver': 'LiveCode Server',
+    'livescript': 'LiveScript',
+    'ls': 'LiveScript',
+    'lua': 'Lua',
+    'makefile': 'Makefile',
+    'mk': 'Makefile',
+    'mak': 'Makefile',
+    'markdown': 'Markdown',
+    'md': 'Markdown',
+    'mkdown': 'Markdown',
+    'mkd': 'Markdown',
+    'mathematica': 'Mathematica',
+    'mma': 'Mathematica',
+    'matlab': 'Matlab',
+    'maxima': 'Maxima',
+    'mel': 'Maya Embedded Language',
+    'mercury': 'Mercury',
+    'mizar': 'Mizar',
+    'mojolicious': 'Mojolicious',
+    'monkey': 'Monkey',
+    'nsis': 'NSIS',
+    'nginx': 'Nginx',
+    'nginxconf': 'Nginx',
+    'nimrod': 'Nimrod',
+    'nim': 'Nimrod',
+    'nix': 'Nix',
+    'ocaml': 'OCaml',
+    'ml': 'OCaml',
+    'objectivec': 'Objective C',
+    'mm': 'Objective C',
+    'objc': 'Objective C',
+    'obj-c': 'Objective C',
+    'glsl': 'OpenGL Shading Language',
+    'openscad': 'OpenSCAD',
+    'scad': 'OpenSCAD',
+    'ruleslanguage': 'Oracle Rules Language',
+    'oxygene': 'Oxygene',
+    'pf': 'PF',
+    'pf.conf': 'PF',
+    'php': 'PHP',
+    'php3': 'PHP',
+    'php4': 'PHP',
+    'php5': 'PHP',
+    'php6': 'PHP',
+    'parser3': 'Parser3',
+    'perl': 'Perl',
+    'pl': 'Perl',
+    'powershell': 'PowerShell',
+    'ps': 'PowerShell',
+    'processing': 'Processing',
+    'prolog': 'Prolog',
+    'protobuf': 'Protocol Buffers',
+    'puppet': 'Puppet',
+    'pp': 'Puppet',
+    'python': 'Python',
+    'py': 'Python',
+    'gyp': 'Python',
+    'profile': 'Python profiler results',
+    'k': 'Q',
+    'kdb': 'Q',
+    'qml': 'QML',
+    'r': 'R',
+    'rib': 'RenderMan RIB',
+    'rsl': 'RenderMan RSL',
+    'graph': 'Roboconf',
+    'instances': 'Roboconf',
+    'ruby': 'Ruby',
+    'rb': 'Ruby',
+    'gemspec': 'Ruby',
+    'podspec': 'Ruby',
+    'thor': 'Ruby',
+    'irb': 'Ruby',
+    'rust': 'Rust',
+    'rs': 'Rust',
+    'scss': 'SCSS',
+    'sql': 'SQL',
+    'p21': 'STEP Part 21',
+    'step': 'STEP Part 21',
+    'stp': 'STEP Part 21',
+    'scala': 'Scala',
+    'scheme': 'Scheme',
+    'scilab': 'Scilab',
+    'sci': 'Scilab',
+    'smali': 'Smali',
+    'smalltalk': 'Smalltalk',
+    'st': 'Smalltalk',
+    'stan': 'Stan',
+    'stata': 'Stata',
+    'stylus': 'Stylus',
+    'styl': 'Stylus',
+    'swift': 'Swift',
+    'tcl': 'Tcl',
+    'tk': 'Tcl',
+    'tex': 'TeX',
+    'thrift': 'Thrift',
+    'tp': 'TP',
+    'twig': 'Twig',
+    'craftcms': 'Twig',
+    'typescript': 'TypeScript',
+    'ts': 'TypeScript',
+    'vbnet': 'VB.Net',
+    'vb': 'VB.Net',
+    'vbscript': 'VBScript',
+    'vbs': 'VBScript',
+    'vhdl': 'VHDL',
+    'vala': 'Vala',
+    'verilog': 'Verilog',
+    'v': 'Verilog',
+    'vim': 'Vim Script',
+    'x86asm': 'x86 Assembly',
+    'xl': 'XL',
+    'tao': 'XL',
+    'xpath': 'XQuery',
+    'xq': 'XQuery',
+    'zephir': 'Zephir',
+    'zep': 'Zephir',
 }
 
-function formatMathContent(mathContent, displayMode, sourceLineString, langPrefix) {
-    var result = '';
-    if (typeof katex === "undefined") {
-        result = makeErrorMark("No Katex", mathContent);
-    }
-    try {
-        result = katex.renderToString(mathContent, {displayMode: displayMode});
-    }
-    catch(err) {
-        result = makeErrorMark("Math Convert Error", mathContent);
-    }
-    return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
-}
 
-function highLightJs(code, langName, isInline, sourceLineString, langPrefix) {
-    var highlighted = code;
-    var langClass = '';
-    if (langName && hljs.getLanguage(langName)) {
-        langClass = ' ' + langPrefix + langName;
-        try {
-            highlighted = hljs.highlight(langName, code, true).value;
-        } catch (__) {}
-    }
-
-
-    if (isInline) {
-        return '<code class="hljs inline' + langClass + '">'
-            + highlighted
-            + '</code>';
-    }
-    else {
-        return  '<pre' + sourceLineString + '><code class="hljs' + langClass + '">'
-            + highlighted + '</code></pre>\n';
-    }
-
-
-}
 
 module.exports = function(settingOptions) {
     var markdownYt = markdownit();
     var options = markdownYt.utils.assign({}, defaults, settingOptions);
     markdownYt = markdownYt.set(options);
+    
+    function makeErrorMark(title, content) {
+        return "<mark style=\"background-color: red;\" title=\"" + title + "\">" + content + "</mark>";
+    }
+
+    function formatMathContent(mathContent, displayMode, sourceLineString, options) {
+        var result = '';
+        if (typeof katex === "undefined") {
+            result = makeErrorMark("No Katex", mathContent);
+        }
+        try {
+            result = katex.renderToString(mathContent, { displayMode: displayMode });
+        }
+        catch (err) {
+            result = makeErrorMark("Math Convert Error", mathContent);
+        }
+        return '<span class="katex-math"' + sourceLineString + '>' + result + '</span>';
+    }
+
+    function highLightJs(code, langInfo, isInline, sourceLineString, options) {
+        var highlighted = '';
+        var langClass = '';
+        var langDisplay = langNamesForDisplay[langInfo.toLowerCase()];
+        var langNameDisplay = '';
+
+        if (langInfo && hljs.getLanguage(langInfo)) {
+            langClass = ' ' + options.langPrefix + langInfo;
+            try {
+                highlighted = hljs.highlight(langInfo, code, true).value;
+            } catch (__) { 
+                highlighted = markdownYt.utils.escapeHtml(code);
+            }
+        } else {
+            highlighted = markdownYt.utils.escapeHtml(code);
+        }
+
+        if (isInline) {
+            if (langDisplay && options.useShowLangName) {
+                langNameDisplay = ' title="' + langDisplay + '"';
+            }
+            return '<code class="hljs inline' + langClass + '"' + langNameDisplay + '>'
+                + highlighted
+                + '</code>';
+        }
+        else {
+            if (langDisplay && options.useShowLangName) {
+                langNameDisplay = '<div class="show-language"><div class="show-language-label">' + langDisplay + '</div></div>';
+            }
+            var lineNumbersWrapper = '';
+            var lineNumbersClass = '';
+            if (options.useLineNumber) {
+                var match = code.match(/\n(?!$)/g);
+                var linesNum = match ? match.length + 1 : 1;
+                var lines = new Array(linesNum + 1);
+                lineNumbersWrapper = '<span class="line-numbers-rows">' + lines.join('<span></span>') + '</span>';
+                lineNumbersClass = ' line-numbers';
+            }
+
+            return langNameDisplay + '<pre' + sourceLineString + ' class="hljs' + lineNumbersClass + '"><code class="' + langClass + '">'
+                + highlighted + lineNumbersWrapper + '</code></pre>\n';
+        }
+    }
 
     if (options.useAbbr) {
         markdownYt = markdownYt.use(markdownitAbbr);
@@ -119,29 +398,32 @@ module.exports = function(settingOptions) {
         });
     }
 
+    markdownYt.renderer.render = function(tokens, options, env) {
+        var i, len, type,
+            result = '',
+            rules = this.rules;
 
-    markdownYt.tags = {};
-    markdownYt.renderer.renderToken = function(tokens, idx, options) {
-        var token = tokens[idx];
-        var tag = token.type;
-        var mainTag = '';
-        if(tag.endsWith('_open')) {
-            mainTag = tag.substr(0, tag.length - 5);
-            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) + 1;
+        for (i = 0, len = tokens.length; i < len; i++) {
 
-            // source map
-            if(options.useSourceLine && token.level == 0 && token.map != null) {
-                token.attrPush(['data-source-line', token.map[0] + 1]);
+            if (options.useSourceLine && tokens[i].type.match(/_open$/i) && tokens[i].level === 0 && tokens[i].map != null) {
+                tokens[i].attrPush(['data-source-line', tokens[i].map[0] + 1]);
             }
-        } else if (tag.endsWith('_close')) {
-            mainTag = tag.substr(0, tag.length - 6);
-            markdownYt.tags[mainTag] = (markdownYt.tags[mainTag] || 0) - 1;
+
+            type = tokens[i].type;
+
+            if (type === 'inline') {
+                result += this.renderInline(tokens[i].children, options, env);
+            } else if (typeof rules[type] !== 'undefined') {
+                result += rules[tokens[i].type](tokens, i, options, env, this);
+            } else {
+                result += this.renderToken(tokens, i, options, env);
+            }
         }
 
-        return markdownYt.renderer.constructor.prototype.renderToken.call(this, tokens, idx, options);
+        return result;
     };
 
-    markdownYt.renderer.rules.code_inline = function(tokens, idx) {
+    markdownYt.renderer.rules.code_inline = function(tokens, idx, options) {
         var content = tokens[idx].content;
         var langName = '';
 
@@ -152,10 +434,10 @@ module.exports = function(settingOptions) {
         }
 
         if (options.highlight !== true && options.highlight) {
-            return options.highlight(content, langName, true, '', markdownYt.options.langPrefix);
+            return options.highlight(content, langName, true, '', markdownYt.options);
         }
-        if (options.highlight === true && typeof hljs !== "undefined") {
-            return highLightJs(content, langName, true, '', markdownYt.options.langPrefix);
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(content, langName, true, '', markdownYt.options);
         }
         else if (langName.length > 0) {
             return '<code class="' + markdownYt.options.langPrefix + langName + '">'
@@ -173,15 +455,15 @@ module.exports = function(settingOptions) {
         var langName = token.info.trim();
         var sourceLineString = options.useSourceLine ? ' data-source-line="' + (token.map[0] + 1) + '"': '';
 
-        if(options.useMath && /math/im.test(langName)) {
+        if(options.useMath && /math/i.test(langName)) {
             return formatMathContent(code, true, sourceLineString);
         }
 
         if (options.highlight !== true && options.highlight) {
-            return options.highlight(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+            return options.highlight(code, langName, false, sourceLineString, markdownYt.options);
         }
-        if (options.highlight === true && typeof hljs !== "undefined") {
-            return highLightJs(code, langName, false, sourceLineString, markdownYt.options.langPrefix);
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return highLightJs(code, langName, false, sourceLineString, markdownYt.options);
         }
         else if (langName) {
             return  '<pre' + sourceLineString + '><code class="' + markdownYt.options.langPrefix + langName + '">'
@@ -202,6 +484,14 @@ module.exports = function(settingOptions) {
 
         if (options.useCodeBlockPre) {
             return  '<pre' + sourceLineString + '>' + markdownYt.utils.escapeHtml(code) + '</pre>\n';
+        }
+        else if (options.highlight !== true && options.highlight) {
+            return options.highlight(code, '', false, sourceLineString, markdownYt.options);
+        }
+        else if (options.highlight === true && typeof hljs !== "undefined") {
+            return '<pre' + sourceLineString + ' class="hljs"><code>' 
+                + markdownYt.utils.escapeHtml(code) 
+                + '</code></pre>\n';
         }
         else {
             return  '<pre' + sourceLineString + '><code>'
