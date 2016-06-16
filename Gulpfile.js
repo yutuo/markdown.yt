@@ -11,6 +11,7 @@ var concat = require("gulp-concat");
 var notify = require("gulp-notify");
 var header = require("gulp-header");
 var minifycss = require("gulp-minify-css");
+var browserify = require('gulp-browserify');
 //var jsdoc        = require("gulp-jsdoc");
 //var jsdoc2md     = require("gulp-jsdoc-to-markdown");
 var pkg = require("./package.json");
@@ -50,7 +51,7 @@ gulp.task("css", function () {
         .pipe(notify({message: "markdown.yt css task complete!"}));
 });
 
-var jsSrcs = [
+var jsLibSrcs = [
     "lib/markdown-it/markdown-it.js",
     "lib/markdown-it/markdown-it-abbr.js",
     "lib/markdown-it/markdown-it-container.js",
@@ -64,7 +65,9 @@ var jsSrcs = [
     "lib/markdown-it/markdown-it-sup.js",
     "lib/markdown-it/markdown-it-toc.js",
     "lib/markdown-it/markdown-it-simplemath.js",
-    
+];
+
+var jsSrcs = [    
     "src/markdownyt.js",
 ];
 
@@ -72,6 +75,7 @@ gulp.task("js", function () {
     
     return gulp.src(jsSrcs)
         .pipe(concat("markdownyt.js"))
+        .pipe(browserify({standalone: 'MarkdownYt'}))
         .pipe(gulp.dest(dist))
         .pipe(concat("markdownyt.min.js"))
         .pipe(uglify())
@@ -86,8 +90,27 @@ gulp.task("js", function () {
         .pipe(notify({message: "markdown.yt js task complete!"}));
 });
 
+gulp.task("jsall", function () {
+    
+    return gulp.src(jsLibSrcs.concat([dist + '/markdownyt.js']))
+        .pipe(concat("markdownyt.all.js"))
+        .pipe(gulp.dest(dist))
+        .pipe(concat("markdownyt.all.min.js"))
+        .pipe(uglify())
+        .pipe(gulp.dest(dist))
+        .pipe(header(headerMiniComment, {
+            pkg: pkg, fileName: function (file) {
+                var name = file.path.split(file.base + "\\");
+                return (name[1] ? name[1] : name[0]).replace(/\\/g, "");
+            }
+        }))
+        .pipe(gulp.dest(dist))
+        .pipe(notify({message: "markdown.yt all js task complete!"}));
+});
+
 
 gulp.task("default", function () {
     gulp.run("css");
     gulp.run("js");
+    gulp.run("jsall");
 });
