@@ -3,12 +3,10 @@
 var os = require("os");
 var gulp = require("gulp");
 var gutil = require("gulp-util");
-var sass = require("gulp-ruby-sass");
 var jshint = require("gulp-jshint");
 var uglify = require("gulp-uglifyjs");
 var rename = require("gulp-rename");
 var concat = require("gulp-concat");
-var notify = require("gulp-notify");
 var header = require("gulp-header");
 var minifycss = require("gulp-minify-css");
 var browserify = require('gulp-browserify');
@@ -47,8 +45,7 @@ gulp.task("css", function () {
         .pipe(gulp.dest(dist))
         .pipe(concat("markdownyt.min.css"))
         .pipe(minifycss({compatibility: 'ie8'}))
-        .pipe(gulp.dest(dist))
-        .pipe(notify({message: "markdown.yt css task complete!"}));
+        .pipe(gulp.dest(dist));
 });
 
 var jsLibSrcs = [
@@ -86,8 +83,7 @@ gulp.task("js", function () {
                 return (name[1] ? name[1] : name[0]).replace(/\\/g, "");
             }
         }))
-        .pipe(gulp.dest(dist))
-        .pipe(notify({message: "markdown.yt js task complete!"}));
+        .pipe(gulp.dest(dist));
 });
 
 gulp.task("jsall", function () {
@@ -104,8 +100,7 @@ gulp.task("jsall", function () {
                 return (name[1] ? name[1] : name[0]).replace(/\\/g, "");
             }
         }))
-        .pipe(gulp.dest(dist))
-        .pipe(notify({message: "markdown.yt all js task complete!"}));
+        .pipe(gulp.dest(dist));
 });
 
 
