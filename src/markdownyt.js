@@ -385,9 +385,11 @@ module.exports = function(settingOptions) {
         markdownYt = markdownYt.use(markdownitToc);
     }
     if (options.useMath) {
-        markdownYt = markdownYt.use(markdownitSimpleMath, {inlineRenderer: function(math, displayMode) {
-            return formatMathContent(math, displayMode, '');
-        }});
+        markdownYt = markdownYt.use(markdownitSimpleMath, {
+            inlineRenderer: function(math, displayMode) {
+                return formatMathContent(math, displayMode, '');
+            }
+        });
     }
     if (options.useLinkNewWin) {
         markdownYt = markdownYt.use(markdownitForInline, "url_new_win", "link_open", function (tokens, idx) {
